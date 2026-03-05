@@ -1,0 +1,155 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Orbitron:wght@400;600;700;900&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --neon: #00ff88;
+  --bg: #080d14;
+  --card: #0d1520;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background-color: #080d14;
+  color: #c9d8e8;
+  font-family: 'JetBrains Mono', monospace;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.neon-text {
+  color: #00ff88;
+  text-shadow: 0 0 10px rgba(0,255,136,0.8), 0 0 30px rgba(0,255,136,0.4);
+}
+
+.neon-text-dim {
+  color: #00ff88;
+  text-shadow: 0 0 8px rgba(0,255,136,0.5);
+}
+
+.glitch { position: relative; }
+.glitch::before, .glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+}
+.glitch::before {
+  animation: glitch1 4s infinite;
+  color: #00d4ff;
+  clip-path: polygon(0 0, 100% 0, 100% 35%, 0 35%);
+}
+.glitch::after {
+  animation: glitch2 4s infinite;
+  color: #ff4560;
+  clip-path: polygon(0 65%, 100% 65%, 100% 100%, 0 100%);
+}
+
+@keyframes glitch1 {
+  0%, 90%, 100% { transform: translate(0); opacity: 0; }
+  92% { transform: translate(-2px, 1px); opacity: 0.7; }
+  94% { transform: translate(2px, -1px); opacity: 0.7; }
+  96% { transform: translate(0); opacity: 0; }
+}
+@keyframes glitch2 {
+  0%, 90%, 100% { transform: translate(0); opacity: 0; }
+  91% { transform: translate(2px, 1px); opacity: 0.7; }
+  93% { transform: translate(-2px, -1px); opacity: 0.7; }
+  95% { transform: translate(0); opacity: 0; }
+}
+
+.challenge-card {
+  transition: all 0.3s ease;
+  border: 1px solid #1a2a3a;
+}
+.challenge-card:hover {
+  border-color: rgba(0,255,136,0.4);
+  box-shadow: 0 0 30px rgba(0,255,136,0.1), inset 0 0 30px rgba(0,255,136,0.03);
+  transform: translateY(-2px);
+}
+.challenge-card.solved {
+  border-color: rgba(0,255,136,0.2);
+  background: linear-gradient(135deg, #0d1520, #0a1a10);
+}
+
+.nkt-input {
+  background: rgba(0,0,0,0.4);
+  border: 1px solid #1a2a3a;
+  color: #c9d8e8;
+  font-family: 'JetBrains Mono', monospace;
+  transition: all 0.3s;
+  outline: none;
+}
+.nkt-input:focus {
+  border-color: #00ff88;
+  box-shadow: 0 0 15px rgba(0,255,136,0.2);
+}
+
+.nkt-btn {
+  background: transparent;
+  border: 1px solid #00ff88;
+  color: #00ff88;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: all 0.3s;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.nkt-btn::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0,255,136,0.1), transparent);
+  transition: left 0.5s;
+}
+.nkt-btn:hover::before { left: 100%; }
+.nkt-btn:hover {
+  background: rgba(0,255,136,0.1);
+  box-shadow: 0 0 20px rgba(0,255,136,0.3);
+}
+.nkt-btn-solid {
+  background: #00ff88;
+  color: #080d14;
+  font-weight: 700;
+}
+.nkt-btn-solid:hover {
+  background: #00cc70;
+  box-shadow: 0 0 25px rgba(0,255,136,0.5);
+  color: #080d14;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #080d14; }
+::-webkit-scrollbar-thumb { background: #1a2a3a; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,255,136,0.3); }
+
+.cat-web { background: rgba(0,212,255,0.1); color: #00d4ff; border-color: rgba(0,212,255,0.3); }
+.cat-forensics { background: rgba(255,165,0,0.1); color: #ffa500; border-color: rgba(255,165,0,0.3); }
+.cat-crypto { background: rgba(148,0,211,0.1); color: #9400d3; border-color: rgba(148,0,211,0.3); }
+.cat-osint { background: rgba(255,69,96,0.1); color: #ff4560; border-color: rgba(255,69,96,0.3); }
+.cat-misc { background: rgba(200,200,200,0.1); color: #aaa; border-color: rgba(200,200,200,0.3); }
