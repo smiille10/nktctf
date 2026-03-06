@@ -1,7 +1,7 @@
 const https = require('https');
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
-const FROM_EMAIL = 'nktctf@nktctf.com';
+const FROM_EMAIL = 'smileemr10@gmail.com';
 const FROM_NAME = 'NKTCTF';
 
 const sendEmail = (to, subject, htmlContent) => {
