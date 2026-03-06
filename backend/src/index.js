@@ -5,6 +5,8 @@ const fs      = require('fs');
 
 const app = express();
 
+app.set('trust proxy', 1); // ← Fix Railway proxy
+
 // ── Middleware ──
 app.use(cors({
   origin: [

@@ -1,22 +1,24 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-console.log('📧 Mailer init:', process.env.GMAIL_USER);
+console.log('📧 Mailer init: Brevo SMTP');
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp-relay.brevo.com',
+  port: 587,
+  secure: false,
   auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS,
+    user: process.env.BREVO_USER,
+    pass: process.env.BREVO_PASS,
   },
 });
 
 // Test la connexion au démarrage
 transporter.verify((error, success) => {
   if (error) {
-    console.error('❌ Gmail connection failed:', error.message);
+    console.error('❌ Brevo connection failed:', error.message);
   } else {
-    console.log('✅ Gmail ready to send emails !');
+    console.log('✅ Brevo ready to send emails !');
   }
 });
 
@@ -26,7 +28,7 @@ const sendVerificationEmail = async (email, username, token) => {
   console.log('📤 Sending email to:', email);
   
   const result = await transporter.sendMail({
-    from: `"NKTCTF" <${process.env.GMAIL_USER}>`,
+    from: '"NKTCTF" <nktctf@smtp-brevo.com>',
     to: email,
     subject: '🔐 NKTCTF — Vérifie ton email',
     html: `
