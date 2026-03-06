@@ -15,6 +15,7 @@ import Admin from './pages/Admin';
 import Profile from './pages/Profile';
 import Account from './pages/Account';
 import Teams from './pages/Teams';
+import Landing from './pages/Landing';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -46,7 +47,11 @@ function AppRoutes() {
     <>
       {user && <Navbar />}
       <Routes>
-        <Route path="/"                element={<Navigate to="/dashboard" replace />} />
+        {/* Landing page — visible si pas connecté */}
+        <Route path="/" element={
+          user ? <Navigate to="/dashboard" replace /> : <Landing />
+        } />
+
         <Route path="/login"           element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/register"        element={<PublicRoute><Register /></PublicRoute>} />
         <Route path="/verify-email"    element={<VerifyEmail />} />
@@ -71,7 +76,7 @@ function AppRoutes() {
           </ProtectedRoute>
         } />
 
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
   );
