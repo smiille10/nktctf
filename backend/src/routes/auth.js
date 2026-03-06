@@ -5,13 +5,12 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const pool = require('../db/pool');
 
-const authMiddleware = require('../middleware/auth'); // ✅ IMPORTANT
-const { authLimiter } = require('../middleware/rateLimit');
+const authMiddleware = require('../middleware/auth');
 const { sendVerificationEmail } = require('../utils/mailer');
 
 
 // ───────────────── REGISTER ─────────────────
-router.post('/register', authLimiter, async (req, res) => {
+router.post('/register', async (req, res) => {
   const { username, email, password } = req.body;
 
   if (!username || !email || !password) {
@@ -50,6 +49,7 @@ router.post('/register', authLimiter, async (req, res) => {
     if (err.code === '23505') {
       return res.status(400).json({ error: 'Username ou email déjà utilisé' });
     }
+    console.error('Register error:', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -66,8 +66,8 @@ router.get('/verify-email', async (req, res) => {
   try {
     const result = await pool.query(
       `UPDATE users
-       SET email_verified = true, email_token = null
-       WHERE email_token = $1
+       SET email_verified = true, email_verify_token = null
+       WHERE email_verify_token = $1
        RETURNING id`,
       [token]
     );
@@ -80,19 +80,20 @@ router.get('/verify-email', async (req, res) => {
       message: 'Email vérifié avec succès ! Tu peux maintenant te connecter.'
     });
 
-  } catch {
+  } catch (err) {
+    console.error('Verify error:', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
 
 // ───────────────── LOGIN ─────────────────
-router.post('/login', authLimiter, async (req, res) => {
+router.post('/login', async (req, res) => {
   const { username, password } = req.body;
 
   try {
     const result = await pool.query(
-      'SELECT * FROM users WHERE username = $1',
+      'SELECT * FROM users WHERE username = $1 OR email = $1',
       [username]
     );
 
@@ -135,7 +136,8 @@ router.post('/login', authLimiter, async (req, res) => {
       }
     });
 
-  } catch {
+  } catch (err) {
+    console.error('Login error:', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -160,7 +162,7 @@ router.get('/me', authMiddleware, async (req, res) => {
 
 
 // ───────────────── RESEND VERIFICATION ─────────────────
-router.post('/resend-verification', authLimiter, async (req, res) => {
+router.post('/resend-verification', async (req, res) => {
   const { email } = req.body;
 
   try {
@@ -182,7 +184,7 @@ router.post('/resend-verification', authLimiter, async (req, res) => {
     const emailToken = crypto.randomBytes(32).toString('hex');
 
     await pool.query(
-      'UPDATE users SET email_token = $1 WHERE email = $2',
+      'UPDATE users SET email_verify_token = $1 WHERE email = $2',
       [emailToken, email]
     );
 
@@ -190,7 +192,8 @@ router.post('/resend-verification', authLimiter, async (req, res) => {
 
     res.json({ message: 'Email de vérification renvoyé !' });
 
-  } catch {
+  } catch (err) {
+    console.error('Resend error:', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
