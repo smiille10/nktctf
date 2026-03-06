@@ -46,10 +46,10 @@ router.post('/register', async (req, res) => {
     });
 
   } catch (err) {
+    console.error('Register error:', err.message, err.stack);
     if (err.code === '23505') {
       return res.status(400).json({ error: 'Username ou email déjà utilisé' });
     }
-    console.error('Register error:', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -81,7 +81,7 @@ router.get('/verify-email', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Verify error:', err.message);
+    console.error('Verify error:', err.message, err.stack);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -137,7 +137,7 @@ router.post('/login', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Login error:', err.message);
+    console.error('Login error:', err.message, err.stack);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -193,7 +193,7 @@ router.post('/resend-verification', async (req, res) => {
     res.json({ message: 'Email de vérification renvoyé !' });
 
   } catch (err) {
-    console.error('Resend error:', err.message);
+    console.error('Resend error:', err.message, err.stack);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
