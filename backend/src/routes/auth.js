@@ -23,21 +23,20 @@ router.post('/register', async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO users (username, email, password_hash, email_verify_token, email_verified, role)
-       VALUES ($1, $2, $3, $4, false, 'user')
+       VALUES ($1, $2, $3, $4, true, 'user')
        RETURNING id, username, email, score, role, email_verified`,
       [username, email, hash, emailToken]
     );
 
     const user = result.rows[0];
 
-    try {
-      await sendVerificationEmail(email, username, emailToken);
-    } catch (mailErr) {
-      console.error('Email error:', mailErr.message);
-    }
+    // Envoi email en arrière-plan (non bloquant)
+    sendVerificationEmail(email, username, emailToken).catch(err => {
+      console.error('Email error:', err.message);
+    });
 
     res.json({
-      message: 'Compte créé ! Vérifie ton email pour activer ton compte.',
+      message: 'Compte créé avec succès ! Tu peux maintenant te connecter.',
       user: {
         id: user.id,
         username: user.username,
