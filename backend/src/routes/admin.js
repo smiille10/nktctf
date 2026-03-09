@@ -22,23 +22,32 @@ const isSuperAdmin = (req, res, next) => {
 // ─── STATS ───────────────────────────────────────────
 
 router.get('/stats', authMiddleware, isAdminOrManager, async (req, res) => {
-  const users       = await pool.query('SELECT COUNT(*) FROM users');
-  const challenges  = await pool.query('SELECT COUNT(*) FROM challenges');
-  const solves      = await pool.query('SELECT COUNT(*) FROM solves');
-  const submissions = await pool.query('SELECT COUNT(*) FROM submissions');
-  res.json({
-    users:       parseInt(users.rows[0].count),
-    challenges:  parseInt(challenges.rows[0].count),
-    solves:      parseInt(solves.rows[0].count),
-    submissions: parseInt(submissions.rows[0].count),
-  });
+  try {
+    const users       = await pool.query('SELECT COUNT(*) FROM users');
+    const challenges  = await pool.query('SELECT COUNT(*) FROM challenges');
+    const solves      = await pool.query('SELECT COUNT(*) FROM solves');
+    const submissions = await pool.query('SELECT COUNT(*) FROM submissions');
+    res.json({
+      users:       parseInt(users.rows[0].count),
+      challenges:  parseInt(challenges.rows[0].count),
+      solves:      parseInt(solves.rows[0].count),
+      submissions: parseInt(submissions.rows[0].count),
+    });
+  } catch (err) {
+    console.error('Stats error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ─── CHALLENGES ───────────────────────────────────────
 
 router.get('/challenges', authMiddleware, isAdminOrManager, async (req, res) => {
-  const result = await pool.query('SELECT * FROM challenges ORDER BY created_at DESC');
-  res.json(result.rows);
+  try {
+    const result = await pool.query('SELECT * FROM challenges ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.post('/challenges', authMiddleware, isAdminOrManager, upload.single('file'), async (req, res) => {
@@ -98,30 +107,42 @@ router.put('/challenges/:id', authMiddleware, isAdminOrManager, upload.single('f
 });
 
 router.patch('/challenges/:id/toggle', authMiddleware, isAdminOrManager, async (req, res) => {
-  const result = await pool.query(
-    'UPDATE challenges SET is_active = NOT is_active WHERE id = $1 RETURNING *',
-    [req.params.id]
-  );
-  res.json(result.rows[0]);
+  try {
+    const result = await pool.query(
+      'UPDATE challenges SET is_active = NOT is_active WHERE id = $1 RETURNING *',
+      [req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.delete('/challenges/:id', authMiddleware, isAdminOrManager, async (req, res) => {
-  const ch = await pool.query('SELECT file_path FROM challenges WHERE id = $1', [req.params.id]);
-  if (ch.rows[0]?.file_path) {
-    const filePath = path.join(__dirname, '../../uploads', ch.rows[0].file_path);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  try {
+    const ch = await pool.query('SELECT file_path FROM challenges WHERE id = $1', [req.params.id]);
+    if (ch.rows[0]?.file_path) {
+      const filePath = path.join(__dirname, '../../uploads', ch.rows[0].file_path);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
+    await pool.query('DELETE FROM challenges WHERE id = $1', [req.params.id]);
+    res.json({ message: 'Challenge supprimé' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  await pool.query('DELETE FROM challenges WHERE id = $1', [req.params.id]);
-  res.json({ message: 'Challenge supprimé' });
 });
 
 // ─── USERS ────────────────────────────────────────────
 
 router.get('/users', authMiddleware, isSuperAdmin, async (req, res) => {
-  const result = await pool.query(
-    'SELECT id, username, email, role, score, email_verified, created_at FROM users ORDER BY created_at DESC'
-  );
-  res.json(result.rows);
+  try {
+    const result = await pool.query(
+      'SELECT id, username, email, role, score, email_verified, created_at FROM users ORDER BY created_at DESC'
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.post('/users', authMiddleware, isSuperAdmin, async (req, res) => {
@@ -141,9 +162,13 @@ router.post('/users', authMiddleware, isSuperAdmin, async (req, res) => {
 });
 
 router.patch('/users/:id/role', authMiddleware, isSuperAdmin, async (req, res) => {
-  const { role } = req.body;
-  await pool.query('UPDATE users SET role = $1 WHERE id = $2', [role, req.params.id]);
-  res.json({ message: 'Rôle mis à jour' });
+  try {
+    const { role } = req.body;
+    await pool.query('UPDATE users SET role = $1 WHERE id = $2', [role, req.params.id]);
+    res.json({ message: 'Rôle mis à jour' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.patch('/users/:id', authMiddleware, isSuperAdmin, async (req, res) => {
@@ -173,20 +198,28 @@ router.patch('/users/:id', authMiddleware, isSuperAdmin, async (req, res) => {
 });
 
 router.delete('/users/:id', authMiddleware, isSuperAdmin, async (req, res) => {
-  await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
-  res.json({ message: 'Utilisateur supprimé' });
+  try {
+    await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
+    res.json({ message: 'Utilisateur supprimé' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ─── EVENTS ───────────────────────────────────────────
 
 router.get('/events', authMiddleware, isAdminOrManager, async (req, res) => {
-  const result = await pool.query(`
-    SELECT e.*, COUNT(er.user_id) as participants
-    FROM events e
-    LEFT JOIN event_registrations er ON er.event_id = e.id
-    GROUP BY e.id ORDER BY e.created_at DESC
-  `);
-  res.json(result.rows);
+  try {
+    const result = await pool.query(`
+      SELECT e.*, COUNT(er.user_id) as participants
+      FROM events e
+      LEFT JOIN event_registrations er ON er.event_id = e.id
+      GROUP BY e.id ORDER BY e.created_at DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.post('/events', authMiddleware, isAdminOrManager, async (req, res) => {
@@ -206,30 +239,43 @@ router.post('/events', authMiddleware, isAdminOrManager, async (req, res) => {
 
 router.put('/events/:id', authMiddleware, isAdminOrManager, async (req, res) => {
   const { title, description, mode, is_free, price, max_participants, start_date, end_date, status } = req.body;
-  const result = await pool.query(
-    `UPDATE events SET title=$1, description=$2, mode=$3, is_free=$4, price=$5,
-     max_participants=$6, start_date=$7, end_date=$8, status=$9
-     WHERE id=$10 RETURNING *`,
-    [title, description, mode, is_free, price, max_participants, start_date, end_date, status, req.params.id]
-  );
-  res.json(result.rows[0]);
+  try {
+    const result = await pool.query(
+      `UPDATE events SET title=$1, description=$2, mode=$3, is_free=$4, price=$5,
+       max_participants=$6, start_date=$7, end_date=$8, status=$9
+       WHERE id=$10 RETURNING *`,
+      [title, description, mode, is_free, price, max_participants, start_date, end_date, status, req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.delete('/events/:id', authMiddleware, isAdminOrManager, async (req, res) => {
-  await pool.query('DELETE FROM events WHERE id = $1', [req.params.id]);
-  res.json({ message: 'Event supprimé' });
+  try {
+    await pool.query('DELETE FROM events WHERE id = $1', [req.params.id]);
+    res.json({ message: 'Event supprimé' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ─── DATABASE VIEWER ──────────────────────────────────
 
 router.get('/db/:table', authMiddleware, isSuperAdmin, async (req, res) => {
-  const allowed = ['users', 'challenges', 'solves', 'submissions', 'events', 'event_registrations',
-                   'subscriptions', 'teams', 'team_members', 'team_messages'];
+  const allowed = ['users', 'challenges', 'solves', 'submissions', 'events',
+                   'event_registrations', 'subscriptions', 'teams', 'team_members', 'team_messages'];
   if (!allowed.includes(req.params.table)) {
     return res.status(400).json({ error: 'Table non autorisée' });
   }
-  const result = await pool.query(`SELECT * FROM ${req.params.table} ORDER BY id DESC LIMIT 100`);
-  res.json(result.rows);
+  try {
+    const result = await pool.query(`SELECT * FROM ${req.params.table} ORDER BY id DESC LIMIT 100`);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('DB viewer error:', err.message);
+    res.status(500).json({ error: `Table error: ${err.message}` });
+  }
 });
 
 // ─── TEAMS ────────────────────────────────────────────
