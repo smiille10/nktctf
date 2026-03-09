@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { adminAPI, teamAPI } from '../api'; // ← Ajout de teamAPI
+import { adminAPI, teamAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
-import api from '../api'; // ← Import api pour les appels directs
+import api from '../api';
 import {
   Plus, Trash2, ToggleLeft, ToggleRight,
   Upload, X, Users, Database, Shield,
@@ -92,27 +92,27 @@ export default function Admin() {
   const [loading, setLoading] = useState(false);
 
   // ── refresh helpers ──
-  const refreshChallenges = useCallback(() => 
+  const refreshChallenges = useCallback(() =>
     adminAPI.getChallenges().then(r => setChallenges(r.data)), []);
-  
-  const refreshStats = useCallback(() => 
+
+  const refreshStats = useCallback(() =>
     adminAPI.getStats().then(r => setStats(r.data)), []);
-  
-  const refreshEvents = useCallback(() => 
+
+  const refreshEvents = useCallback(() =>
     adminAPI.getEvents().then(r => setEvents(r.data)), []);
-  
-  const refreshUsers = useCallback(() => 
+
+  const refreshUsers = useCallback(() =>
     adminAPI.getUsers().then(r => setUsers(r.data)), []);
 
   const refreshAdminTeams = useCallback(async () => {
-  try {
-    const r = await adminAPI.getTeams();
-    setAdminTeams(r.data);
-  } catch (err) {
-    console.error('Erreur chargement teams:', err);
-    setAdminTeams([]);
-  }
-}, []);
+    try {
+      const r = await adminAPI.getTeams();
+      setAdminTeams(r.data);
+    } catch (err) {
+      console.error('Erreur chargement teams:', err);
+      setAdminTeams([]);
+    }
+  }, []);
 
   useEffect(() => {
     const loadData = async () => {
@@ -123,7 +123,6 @@ export default function Admin() {
           refreshChallenges(),
           refreshEvents(),
         ]);
-        
         if (isSuperAdmin) {
           await Promise.all([
             refreshUsers(),
@@ -136,17 +135,23 @@ export default function Admin() {
         setLoading(false);
       }
     };
-    
     loadData();
   }, [isSuperAdmin, refreshStats, refreshChallenges, refreshEvents, refreshUsers, refreshAdminTeams]);
 
+  // ── DATABASE VIEWER — fixed ──
   useEffect(() => {
     if (tab === 'database' && isSuperAdmin) {
+      setDbData([]);
+      setMsg('');
       adminAPI.getTable(dbTable)
-        .then(r => setDbData(r.data))
+        .then(r => {
+          setDbData(r.data);
+          setMsg('');
+        })
         .catch(err => {
           console.error('Erreur chargement table:', err);
-          setMsg(`❌ Erreur chargement table ${dbTable}`);
+          setDbData([]);
+          setMsg(`❌ Erreur chargement table ${dbTable}: ${err.response?.data?.error || err.message}`);
         });
     }
   }, [tab, dbTable, isSuperAdmin]);
@@ -178,13 +183,12 @@ export default function Admin() {
 
   const handleSubmitChallenge = async (e) => {
     e.preventDefault();
-    setLoading(true); 
+    setLoading(true);
     setMsg('');
     try {
       const formData = new FormData();
       Object.entries(challengeForm).forEach(([k, v]) => formData.append(k, v));
       if (file) formData.append('file', file);
-      
       if (editingChallenge) {
         await adminAPI.updateChallenge(editingChallenge.id, formData);
         setMsg('✅ Challenge modifié !');
@@ -199,8 +203,8 @@ export default function Admin() {
       await Promise.all([refreshChallenges(), refreshStats()]);
     } catch (err) {
       setMsg('❌ ' + (err.response?.data?.error || 'Erreur lors de la création'));
-    } finally { 
-      setLoading(false); 
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -241,7 +245,7 @@ export default function Admin() {
 
   const handleSubmitEvent = async (e) => {
     e.preventDefault();
-    setLoading(true); 
+    setLoading(true);
     setMsg('');
     try {
       if (editingEvent) {
@@ -257,8 +261,8 @@ export default function Admin() {
       await Promise.all([refreshEvents(), refreshStats()]);
     } catch (err) {
       setMsg('❌ ' + (err.response?.data?.error || 'Erreur lors de la création'));
-    } finally { 
-      setLoading(false); 
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -277,7 +281,7 @@ export default function Admin() {
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
-    setLoading(true); 
+    setLoading(true);
     setMsg('');
     try {
       await adminAPI.createUser(userForm);
@@ -287,8 +291,8 @@ export default function Admin() {
       await refreshUsers();
     } catch (err) {
       setMsg('❌ ' + (err.response?.data?.error || 'Erreur lors de la création'));
-    } finally { 
-      setLoading(false); 
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -301,24 +305,23 @@ export default function Admin() {
 
   const handleEditUser = async (e) => {
     e.preventDefault();
-    setLoading(true); 
+    setLoading(true);
     setEditUserMsg('');
     try {
       const data = { username: editUserForm.username, email: editUserForm.email };
       if (editUserForm.password) data.password = editUserForm.password;
-      
       await adminAPI.editUser(editingUser.id, data);
       setEditUserMsg('✅ Mis à jour !');
-      setTimeout(() => { 
-        setEditingUser(null); 
-        setEditUserForm({}); 
-        setEditUserMsg(''); 
+      setTimeout(() => {
+        setEditingUser(null);
+        setEditUserForm({});
+        setEditUserMsg('');
       }, 1200);
       await refreshUsers();
     } catch (err) {
       setEditUserMsg('❌ ' + (err.response?.data?.error || 'Erreur lors de la mise à jour'));
-    } finally { 
-      setLoading(false); 
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -350,7 +353,6 @@ export default function Admin() {
     setTeamView('members');
     setLoadingTeamDetail(true);
     try {
-      // Essayer de récupérer les membres via différents endpoints
       let membersRes;
       try {
         membersRes = await api.get(`/admin/teams/${team.id}/members`);
@@ -358,15 +360,10 @@ export default function Admin() {
         try {
           membersRes = await api.get(`/teams/${team.id}/members`);
         } catch {
-          // Données mockées pour les membres
-          membersRes = { data: [
-            { id: 1, username: team.captain_name, email: 'captain@example.com', is_captain: true, score: 1200, joined_at: new Date().toISOString() },
-            { id: 2, username: 'Member 1', email: 'member1@example.com', is_captain: false, score: 800, joined_at: new Date().toISOString() },
-          ]};
+          membersRes = { data: [] };
         }
       }
-      
-      // Essayer de récupérer les messages
+
       let messagesRes;
       try {
         messagesRes = await teamAPI.getMessages(team.id);
@@ -374,28 +371,23 @@ export default function Admin() {
         try {
           messagesRes = await api.get(`/teams/${team.id}/messages`);
         } catch {
-          // Données mockées pour les messages
-          messagesRes = { data: [
-            { id: 1, username: team.captain_name, message: 'Bienvenue dans la team !', created_at: new Date().toISOString(), is_captain: true },
-            { id: 2, username: 'Member 1', message: 'Merci !', created_at: new Date().toISOString(), is_captain: false },
-          ]};
+          messagesRes = { data: [] };
         }
       }
-      
+
       setTeamMembers(membersRes.data);
       setTeamMessages(messagesRes.data);
     } catch (err) {
       console.error('Erreur chargement détails team:', err);
       setMsg('❌ Erreur chargement des détails de la team');
-    } finally { 
-      setLoadingTeamDetail(false); 
+    } finally {
+      setLoadingTeamDetail(false);
     }
   };
 
   const handleDeleteTeam = async (id) => {
     if (!confirm('Supprimer cette team définitivement ?')) return;
     try {
-      // Essayer différents endpoints pour la suppression
       try {
         await api.delete(`/admin/teams/${id}`);
       } catch {
@@ -452,13 +444,20 @@ export default function Admin() {
             msg.startsWith('✅')
               ? 'bg-nkt-green/10 border-nkt-green/30 text-nkt-green'
               : 'bg-nkt-red/10 border-nkt-red/30 text-nkt-red'
-          }`}>{msg}</div>
+          }`}>
+            <div className="flex items-center justify-between">
+              <span>{msg}</span>
+              <button onClick={() => setMsg('')} className="ml-4 opacity-60 hover:opacity-100">
+                <X size={14} />
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6 border-b border-nkt-border overflow-x-auto">
           {visibleTabs.map(({ id, label, icon: Icon }) => (
-            <button key={id} onClick={() => setTab(id)}
+            <button key={id} onClick={() => { setTab(id); setMsg(''); }}
               className={`flex items-center gap-2 px-4 py-3 text-xs font-mono font-semibold tracking-wider border-b-2 transition-all whitespace-nowrap ${
                 tab === id
                   ? 'border-nkt-green text-nkt-green'
@@ -871,8 +870,6 @@ export default function Admin() {
         {/* ══════════════ USERS ══════════════ */}
         {tab === 'users' && isSuperAdmin && (
           <div className="space-y-4">
-
-            {/* Modal edit user */}
             {editingUser && (
               <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                 <div className="bg-nkt-card border-2 border-nkt-cyan/40 rounded-xl p-6 w-full max-w-md relative">
@@ -1039,14 +1036,10 @@ export default function Admin() {
         {/* ══════════════ TEAMS ══════════════ */}
         {tab === 'teams' && isSuperAdmin && (
           <div className="space-y-4">
-
-            {/* ── Modal détail team ── */}
             {selectedTeam && (
               <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                 <div className="bg-nkt-card border-2 border-nkt-green/40 rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col relative overflow-hidden">
                   <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-nkt-green to-transparent" />
-
-                  {/* Header modal */}
                   <div className="flex items-center justify-between px-5 py-4 border-b border-nkt-border flex-shrink-0">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-lg border border-nkt-green/30 bg-nkt-green/10 flex items-center justify-center">
@@ -1065,13 +1058,10 @@ export default function Admin() {
                         </p>
                       </div>
                     </div>
-                    <button onClick={() => setSelectedTeam(null)}
-                      className="text-nkt-muted hover:text-nkt-text transition-colors">
+                    <button onClick={() => setSelectedTeam(null)} className="text-nkt-muted hover:text-nkt-text transition-colors">
                       <X size={18} />
                     </button>
                   </div>
-
-                  {/* Sub-tabs */}
                   <div className="flex border-b border-nkt-border flex-shrink-0">
                     <button onClick={() => setTeamView('members')}
                       className={`flex items-center gap-2 px-5 py-3 text-xs font-mono font-semibold border-b-2 transition-all ${
@@ -1086,16 +1076,12 @@ export default function Admin() {
                       <MessageSquare size={13} /> CHAT ({teamMessages.length})
                     </button>
                   </div>
-
-                  {/* Contenu */}
                   <div className="flex-1 overflow-y-auto">
                     {loadingTeamDetail ? (
                       <div className="flex items-center justify-center h-40">
                         <div className="w-6 h-6 border-2 border-nkt-green border-t-transparent rounded-full animate-spin" />
                       </div>
                     ) : teamView === 'members' ? (
-
-                      /* ── MEMBRES ── */
                       <div className="divide-y divide-nkt-border/40">
                         {teamMembers.length === 0 ? (
                           <p className="text-center py-10 text-nkt-muted font-mono text-sm">Aucun membre</p>
@@ -1107,8 +1093,7 @@ export default function Admin() {
                                 borderColor: m.is_captain ? '#ffd700' : '#1a2535',
                                 background:  m.is_captain ? 'rgba(255,215,0,0.1)' : 'rgba(255,255,255,0.03)',
                               }}>
-                              <span className="font-bold text-sm"
-                                style={{ color: m.is_captain ? '#ffd700' : '#8899aa' }}>
+                              <span className="font-bold text-sm" style={{ color: m.is_captain ? '#ffd700' : '#8899aa' }}>
                                 {m.username?.[0]?.toUpperCase() || '?'}
                               </span>
                             </div>
@@ -1123,16 +1108,10 @@ export default function Admin() {
                               <p className="font-display font-bold text-sm text-nkt-green">{m.score || 0}</p>
                               <p className="text-[9px] font-mono text-nkt-muted">pts</p>
                             </div>
-                            <p className="text-[10px] font-mono text-nkt-muted hidden sm:block flex-shrink-0">
-                              {m.joined_at ? new Date(m.joined_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) : '—'}
-                            </p>
                           </div>
                         ))}
                       </div>
-
                     ) : (
-
-                      /* ── CHAT ── */
                       <div className="p-4 space-y-3">
                         {teamMessages.length === 0 ? (
                           <div className="text-center py-10">
@@ -1145,9 +1124,7 @@ export default function Admin() {
                             <div key={msg.id || i} className="flex items-start gap-3">
                               {showName ? (
                                 <div className="w-8 h-8 rounded-lg border border-nkt-border bg-nkt-bg flex items-center justify-center flex-shrink-0 mt-0.5">
-                                  <span className="font-bold text-xs text-nkt-muted">
-                                    {msg.username?.[0]?.toUpperCase() || '?'}
-                                  </span>
+                                  <span className="font-bold text-xs text-nkt-muted">{msg.username?.[0]?.toUpperCase() || '?'}</span>
                                 </div>
                               ) : <div className="w-8 flex-shrink-0" />}
                               <div className="flex-1 min-w-0">
@@ -1159,8 +1136,7 @@ export default function Admin() {
                                     {msg.is_captain && <Crown size={10} className="text-yellow-400" />}
                                     <span className="text-[9px] font-mono text-nkt-muted/50">
                                       {msg.created_at ? new Date(msg.created_at).toLocaleString('fr-FR', {
-                                        day: '2-digit', month: 'short',
-                                        hour: '2-digit', minute: '2-digit',
+                                        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
                                       }) : ''}
                                     </span>
                                   </div>
@@ -1175,12 +1151,8 @@ export default function Admin() {
                       </div>
                     )}
                   </div>
-
-                  {/* Footer */}
                   <div className="border-t border-nkt-border px-5 py-3 flex justify-between items-center flex-shrink-0 bg-nkt-bg/30">
-                    <p className="text-[10px] font-mono text-nkt-muted">
-                      🔒 Accès admin uniquement
-                    </p>
+                    <p className="text-[10px] font-mono text-nkt-muted">🔒 Accès admin uniquement</p>
                     <button onClick={() => handleDeleteTeam(selectedTeam.id)}
                       className="flex items-center gap-2 px-4 py-2 rounded border border-nkt-red/30 text-nkt-red bg-nkt-red/5 hover:bg-nkt-red/10 transition-all text-xs font-mono font-bold">
                       <Trash2 size={13} /> SUPPRIMER LA TEAM
@@ -1190,18 +1162,15 @@ export default function Admin() {
               </div>
             )}
 
-            {/* Header */}
             <div className="flex items-center justify-between">
               <p className="text-nkt-muted font-mono text-xs">
                 {adminTeams.length} team{adminTeams.length !== 1 ? 's' : ''} enregistrée{adminTeams.length !== 1 ? 's' : ''}
               </p>
-              <button onClick={refreshAdminTeams}
-                className="nkt-btn px-4 py-2 rounded text-xs flex items-center gap-2">
+              <button onClick={refreshAdminTeams} className="nkt-btn px-4 py-2 rounded text-xs flex items-center gap-2">
                 ↻ RAFRAÎCHIR
               </button>
             </div>
 
-            {/* Table */}
             <div className="bg-nkt-card border border-nkt-border rounded-lg overflow-hidden">
               <div className="border-b border-nkt-border px-5 py-3 grid grid-cols-12 gap-2 bg-nkt-bg/30">
                 <span className="col-span-3 text-[10px] font-mono text-nkt-muted tracking-wider">TEAM</span>
@@ -1210,7 +1179,6 @@ export default function Admin() {
                 <span className="col-span-2 text-[10px] font-mono text-nkt-muted tracking-wider">CODE INVITE</span>
                 <span className="col-span-2 text-[10px] font-mono text-nkt-muted tracking-wider text-right">ACTIONS</span>
               </div>
-
               {adminTeams.length === 0 ? (
                 <div className="text-center py-16">
                   <Users size={40} className="text-nkt-muted/20 mx-auto mb-3" />
@@ -1222,26 +1190,21 @@ export default function Admin() {
                     selectedTeam?.id === team.id ? 'bg-nkt-green/5 border-l-4 border-l-nkt-green' : ''
                   }`}
                   onClick={() => openTeamDetail(team)}>
-
                   <div className="col-span-3 flex items-center gap-2">
                     <div className="w-8 h-8 rounded-lg border border-nkt-green/20 bg-nkt-green/5 flex items-center justify-center text-xs font-bold text-nkt-green flex-shrink-0">
                       {team.name?.[0]?.toUpperCase() || '?'}
                     </div>
                     <span className="font-mono text-sm text-nkt-text font-semibold truncate">{team.name}</span>
                   </div>
-
                   <div className="col-span-3 flex items-center gap-1">
                     <Crown size={11} className="text-yellow-400 flex-shrink-0" />
                     <span className="font-mono text-xs text-nkt-muted truncate">{team.captain_name}</span>
                   </div>
-
                   <div className="col-span-2">
                     <div className="flex items-center gap-1.5">
                       {Array.from({ length: 4 }).map((_, i) => (
                         <div key={i} className={`w-4 h-4 rounded border flex items-center justify-center ${
-                          i < (team.member_count || 0)
-                            ? 'border-nkt-green bg-nkt-green/20'
-                            : 'border-nkt-border/30'
+                          i < (team.member_count || 0) ? 'border-nkt-green bg-nkt-green/20' : 'border-nkt-border/30'
                         }`}>
                           {i < (team.member_count || 0) && <div className="w-1.5 h-1.5 rounded-full bg-nkt-green" />}
                         </div>
@@ -1249,23 +1212,20 @@ export default function Admin() {
                       <span className="text-[10px] font-mono text-nkt-muted ml-1">{team.member_count || 0}/4</span>
                     </div>
                   </div>
-
                   <div className="col-span-2">
                     <span className="font-mono text-xs text-nkt-cyan tracking-widest font-bold">{team.invite_code}</span>
                   </div>
-
                   <div className="col-span-2 flex items-center justify-end gap-2" onClick={e => e.stopPropagation()}>
                     <button onClick={() => openTeamDetail(team)}
                       className={`p-1.5 rounded border transition-all ${
                         selectedTeam?.id === team.id
                           ? 'border-nkt-green bg-nkt-green/20 text-nkt-green'
                           : 'border-nkt-border text-nkt-muted hover:border-nkt-green hover:text-nkt-green hover:bg-nkt-green/10'
-                      }`} title="Voir détails">
+                      }`}>
                       <Eye size={13} />
                     </button>
                     <button onClick={() => handleDeleteTeam(team.id)}
-                      className="p-1.5 rounded border border-transparent text-nkt-muted hover:border-nkt-red/30 hover:text-nkt-red hover:bg-nkt-red/10 transition-all"
-                      title="Supprimer">
+                      className="p-1.5 rounded border border-transparent text-nkt-muted hover:border-nkt-red/30 hover:text-nkt-red hover:bg-nkt-red/10 transition-all">
                       <Trash2 size={13} />
                     </button>
                   </div>
