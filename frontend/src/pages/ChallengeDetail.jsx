@@ -64,6 +64,8 @@ export default function ChallengeDetail() {
 
   const diffStyle = DIFF_STYLES[challenge.difficulty] || DIFF_STYLES.Easy;
 
+  const downloadUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/challenges/${id}/download`;
+
   return (
     <div className="min-h-screen bg-nkt-bg bg-grid pt-20 pb-12">
       <div className="max-w-3xl mx-auto px-4">
@@ -137,28 +139,28 @@ export default function ChallengeDetail() {
 
             {/* Fichier à télécharger */}
             {challenge.file_name && (
-  <a
-    href={`http://localhost:5000/api/challenges/${id}/download`}
-    target="_blank"
-    rel="noreferrer"
-    className="flex items-center justify-between p-4 bg-nkt-bg border border-nkt-cyan/30 rounded-lg hover:border-nkt-cyan/60 hover:bg-nkt-cyan/5 transition-all group"
-  >
-    <div className="flex items-center gap-3">
-      <Download size={16} className="text-nkt-cyan flex-shrink-0" />
-      <div>
-        <p className="text-xs font-mono font-bold text-nkt-cyan tracking-wider">
-          DOWNLOAD FILE
-        </p>
-        <p className="text-[10px] font-mono text-nkt-muted">
-          {challenge.file_name}
-        </p>
-      </div>
-    </div>
-    <span className="text-nkt-cyan/40 group-hover:text-nkt-cyan transition-colors font-mono text-sm">
-      →
-    </span>
-  </a>
-)}
+              <a
+                href={downloadUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-between p-4 bg-nkt-bg border border-nkt-cyan/30 rounded-lg hover:border-nkt-cyan/60 hover:bg-nkt-cyan/5 transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <Download size={16} className="text-nkt-cyan flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-mono font-bold text-nkt-cyan tracking-wider">
+                      DOWNLOAD FILE
+                    </p>
+                    <p className="text-[10px] font-mono text-nkt-muted">
+                      {challenge.file_name}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-nkt-cyan/40 group-hover:text-nkt-cyan transition-colors font-mono text-sm">
+                  →
+                </span>
+              </a>
+            )}
 
             {/* Hint */}
             {challenge.hint && (
