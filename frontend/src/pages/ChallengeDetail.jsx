@@ -24,6 +24,7 @@ export default function ChallengeDetail() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult]       = useState(null);
   const [showHint, setShowHint]   = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     api.get(`/challenges/${id}`)
@@ -55,16 +56,30 @@ export default function ChallengeDetail() {
   };
 
   const handleDownload = async () => {
+    setDownloading(true);
     try {
       const token = localStorage.getItem('nkt_token');
       const url = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/challenges/${id}/download`;
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const data = await res.json();
-      alert(JSON.stringify(data));
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error || 'Erreur téléchargement');
+        return;
+      }
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = challenge.file_name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
     } catch (err) {
       alert('Erreur: ' + err.message);
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -91,6 +106,7 @@ export default function ChallengeDetail() {
         <div className="bg-nkt-card border border-nkt-border rounded-xl overflow-hidden relative">
           <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-nkt-green to-transparent" />
 
+          {/* Header */}
           <div className="p-6 border-b border-nkt-border">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
@@ -122,8 +138,10 @@ export default function ChallengeDetail() {
             </div>
           </div>
 
+          {/* Body */}
           <div className="p-6 space-y-6">
 
+            {/* Description */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <Terminal size={13} className="text-nkt-green" />
@@ -136,28 +154,30 @@ export default function ChallengeDetail() {
               </div>
             </div>
 
+            {/* Download */}
             {challenge.file_name && (
               <button
                 onClick={handleDownload}
-                className="w-full flex items-center justify-between p-4 bg-nkt-bg border border-nkt-cyan/30 rounded-lg hover:border-nkt-cyan/60 hover:bg-nkt-cyan/5 transition-all group"
+                disabled={downloading}
+                className="w-full flex items-center justify-between p-4 bg-nkt-bg border border-nkt-cyan/30 rounded-lg hover:border-nkt-cyan/60 hover:bg-nkt-cyan/5 transition-all group disabled:opacity-50"
               >
                 <div className="flex items-center gap-3">
-                  <Download size={16} className="text-nkt-cyan flex-shrink-0" />
+                  {downloading
+                    ? <span className="w-4 h-4 border-2 border-nkt-cyan border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                    : <Download size={16} className="text-nkt-cyan flex-shrink-0" />
+                  }
                   <div>
                     <p className="text-xs font-mono font-bold text-nkt-cyan tracking-wider">
-                      DOWNLOAD FILE
+                      {downloading ? 'DOWNLOADING...' : 'DOWNLOAD FILE'}
                     </p>
-                    <p className="text-[10px] font-mono text-nkt-muted">
-                      {challenge.file_name}
-                    </p>
+                    <p className="text-[10px] font-mono text-nkt-muted">{challenge.file_name}</p>
                   </div>
                 </div>
-                <span className="text-nkt-cyan/40 group-hover:text-nkt-cyan transition-colors font-mono text-sm">
-                  →
-                </span>
+                <span className="text-nkt-cyan/40 group-hover:text-nkt-cyan transition-colors font-mono text-sm">→</span>
               </button>
             )}
 
+            {/* Hint */}
             {challenge.hint && (
               <div>
                 <button
@@ -176,6 +196,7 @@ export default function ChallengeDetail() {
               </div>
             )}
 
+            {/* Submit / Solved */}
             {challenge.solved ? (
               <div className="flex items-center gap-3 p-4 bg-nkt-green/10 border border-nkt-green/30 rounded-lg">
                 <CheckCircle size={20} className="text-nkt-green flex-shrink-0" />
