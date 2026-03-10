@@ -2,10 +2,11 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db/pool');
 const authMiddleware = require('../middleware/auth');
-const upload = require('../middleware/upload');
-const path = require('path');
-const fs = require('fs');
+const multer = require('multer');
 const bcrypt = require('bcryptjs');
+
+// Stockage en mémoire (plus de filesystem)
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 // ─── MIDDLEWARE ───────────────────────────────────────
 
@@ -54,22 +55,20 @@ router.post('/challenges', authMiddleware, isAdminOrManager, upload.single('file
   const { title, category, description, points, flag, hint, difficulty } = req.body;
 
   if (!title || !category || !description || !points || !flag) {
-    if (req.file) fs.unlinkSync(req.file.path);
     return res.status(400).json({ error: 'Champs requis manquants' });
   }
 
   try {
     const file_name = req.file ? req.file.originalname : null;
-    const file_path = req.file ? req.file.filename : null;
+    const file_data = req.file ? req.file.buffer.toString('base64') : null;
 
     const result = await pool.query(
-      `INSERT INTO challenges (title, category, description, points, flag, hint, difficulty, file_name, file_path, is_active)
+      `INSERT INTO challenges (title, category, description, points, flag, hint, difficulty, file_name, file_data, is_active)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true) RETURNING *`,
-      [title, category, description, parseInt(points), flag, hint || null, difficulty || 'Easy', file_name, file_path]
+      [title, category, description, parseInt(points), flag, hint || null, difficulty || 'Easy', file_name, file_data]
     );
     res.json(result.rows[0]);
   } catch (err) {
-    if (req.file) fs.unlinkSync(req.file.path);
     console.error(err);
     res.status(500).json({ error: 'Erreur création challenge' });
   }
@@ -82,22 +81,18 @@ router.put('/challenges/:id', authMiddleware, isAdminOrManager, upload.single('f
     if (!existing.rows[0]) return res.status(404).json({ error: 'Challenge introuvable' });
 
     let file_name = existing.rows[0].file_name;
-    let file_path = existing.rows[0].file_path;
+    let file_data = existing.rows[0].file_data;
 
     if (req.file) {
-      if (file_path) {
-        const oldPath = path.join(__dirname, '../../uploads', file_path);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-      }
       file_name = req.file.originalname;
-      file_path = req.file.filename;
+      file_data = req.file.buffer.toString('base64');
     }
 
     const result = await pool.query(
       `UPDATE challenges SET title=$1, category=$2, description=$3, points=$4,
-       flag=$5, hint=$6, difficulty=$7, file_name=$8, file_path=$9
+       flag=$5, hint=$6, difficulty=$7, file_name=$8, file_data=$9
        WHERE id=$10 RETURNING *`,
-      [title, category, description, parseInt(points), flag, hint || null, difficulty || 'Easy', file_name, file_path, req.params.id]
+      [title, category, description, parseInt(points), flag, hint || null, difficulty || 'Easy', file_name, file_data, req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -120,11 +115,6 @@ router.patch('/challenges/:id/toggle', authMiddleware, isAdminOrManager, async (
 
 router.delete('/challenges/:id', authMiddleware, isAdminOrManager, async (req, res) => {
   try {
-    const ch = await pool.query('SELECT file_path FROM challenges WHERE id = $1', [req.params.id]);
-    if (ch.rows[0]?.file_path) {
-      const filePath = path.join(__dirname, '../../uploads', ch.rows[0].file_path);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    }
     await pool.query('DELETE FROM challenges WHERE id = $1', [req.params.id]);
     res.json({ message: 'Challenge supprimé' });
   } catch (err) {
@@ -273,7 +263,6 @@ router.get('/db/:table', authMiddleware, isSuperAdmin, async (req, res) => {
     const result = await pool.query(`SELECT * FROM ${req.params.table} ORDER BY id DESC LIMIT 100`);
     res.json(result.rows);
   } catch (err) {
-    console.error('DB viewer error:', err.message);
     res.status(500).json({ error: `Table error: ${err.message}` });
   }
 });
