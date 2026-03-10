@@ -54,6 +54,20 @@ export default function ChallengeDetail() {
     }
   };
 
+  const handleDownload = async () => {
+    try {
+      const token = localStorage.getItem('nkt_token');
+      const url = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/challenges/${id}/download`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      alert(JSON.stringify(data));
+    } catch (err) {
+      alert('Erreur: ' + err.message);
+    }
+  };
+
   if (loading) return (
     <div className="min-h-screen bg-nkt-bg flex items-center justify-center">
       <div className="w-8 h-8 border-2 border-nkt-green border-t-transparent rounded-full animate-spin" />
@@ -64,46 +78,22 @@ export default function ChallengeDetail() {
 
   const diffStyle = DIFF_STYLES[challenge.difficulty] || DIFF_STYLES.Easy;
 
-  const handleDownload = async () => {
-    try {
-      const token = localStorage.getItem('nkt_token');
-      const url = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/challenges/${id}/download`;
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) throw new Error('Erreur téléchargement');
-      const blob = await res.blob();
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = challenge.file_name;
-      a.click();
-      URL.revokeObjectURL(a.href);
-    } catch (err) {
-      alert('Erreur lors du téléchargement');
-    }
-  };
-
   return (
     <div className="min-h-screen bg-nkt-bg bg-grid pt-20 pb-12">
       <div className="max-w-3xl mx-auto px-4">
 
-        {/* Bouton retour */}
         <button
           onClick={() => navigate('/challenges')}
           className="flex items-center gap-2 text-nkt-muted hover:text-nkt-green transition-colors font-mono text-xs mb-6">
           <ArrowLeft size={14} /> BACK TO CHALLENGES
         </button>
 
-        {/* Card */}
         <div className="bg-nkt-card border border-nkt-border rounded-xl overflow-hidden relative">
           <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-nkt-green to-transparent" />
 
-          {/* ── Header ── */}
           <div className="p-6 border-b border-nkt-border">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
-
-                {/* Badges */}
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
                   <span className="text-[10px] font-mono font-bold text-nkt-green border border-nkt-green/30 bg-nkt-green/10 px-2 py-0.5 rounded">
                     {challenge.category}
@@ -117,20 +107,14 @@ export default function ChallengeDetail() {
                     </span>
                   )}
                 </div>
-
-                {/* Titre */}
                 <h1 className="font-display text-2xl font-bold text-nkt-text leading-tight">
                   {challenge.title}
                 </h1>
-
-                {/* Solves */}
                 <div className="flex items-center gap-1 mt-2 text-nkt-muted">
                   <Users size={12} />
                   <span className="text-xs font-mono">{challenge.solves || 0} solves</span>
                 </div>
               </div>
-
-              {/* Points */}
               <div className="text-right flex-shrink-0">
                 <p className="font-display text-4xl font-bold neon-text">{challenge.points}</p>
                 <p className="text-[10px] font-mono text-nkt-muted">POINTS</p>
@@ -138,10 +122,8 @@ export default function ChallengeDetail() {
             </div>
           </div>
 
-          {/* ── Body ── */}
           <div className="p-6 space-y-6">
 
-            {/* Description */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <Terminal size={13} className="text-nkt-green" />
@@ -154,7 +136,6 @@ export default function ChallengeDetail() {
               </div>
             </div>
 
-            {/* Fichier à télécharger */}
             {challenge.file_name && (
               <button
                 onClick={handleDownload}
@@ -177,7 +158,6 @@ export default function ChallengeDetail() {
               </button>
             )}
 
-            {/* Hint */}
             {challenge.hint && (
               <div>
                 <button
@@ -196,33 +176,24 @@ export default function ChallengeDetail() {
               </div>
             )}
 
-            {/* Zone submit ou solved */}
             {challenge.solved ? (
               <div className="flex items-center gap-3 p-4 bg-nkt-green/10 border border-nkt-green/30 rounded-lg">
                 <CheckCircle size={20} className="text-nkt-green flex-shrink-0" />
                 <div>
-                  <p className="font-mono text-sm font-bold text-nkt-green">
-                    CHALLENGE COMPLETED
-                  </p>
-                  <p className="font-mono text-xs text-nkt-muted mt-0.5">
-                    Tu as déjà résolu ce challenge !
-                  </p>
+                  <p className="font-mono text-sm font-bold text-nkt-green">CHALLENGE COMPLETED</p>
+                  <p className="font-mono text-xs text-nkt-muted mt-0.5">Tu as déjà résolu ce challenge !</p>
                 </div>
               </div>
             ) : (
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-nkt-green font-mono text-xs">›_</span>
-                  <span className="text-[11px] font-mono text-nkt-muted tracking-widest">
-                    SUBMIT FLAG
-                  </span>
+                  <span className="text-[11px] font-mono text-nkt-muted tracking-widest">SUBMIT FLAG</span>
                 </div>
 
                 <form onSubmit={handleSubmit} className="flex gap-3">
                   <div className="flex-1 relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-nkt-green font-mono text-sm pointer-events-none">
-                      ›
-                    </span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-nkt-green font-mono text-sm pointer-events-none">›</span>
                     <input
                       className="nkt-input w-full pl-8 pr-4 py-3 rounded-lg text-sm font-mono"
                       placeholder="NKTCTF{your_flag_here}"
@@ -243,21 +214,16 @@ export default function ChallengeDetail() {
                   </button>
                 </form>
 
-                {/* Résultat */}
                 {result && (
                   <div className={`mt-4 flex items-center gap-3 p-4 rounded-lg border ${
-                    result.correct
-                      ? 'bg-nkt-green/10 border-nkt-green/30'
-                      : 'bg-nkt-red/10 border-nkt-red/30'
+                    result.correct ? 'bg-nkt-green/10 border-nkt-green/30' : 'bg-nkt-red/10 border-nkt-red/30'
                   }`}>
                     {result.correct
                       ? <CheckCircle size={18} className="text-nkt-green flex-shrink-0" />
-                      : <XCircle    size={18} className="text-nkt-red flex-shrink-0"   />
+                      : <XCircle size={18} className="text-nkt-red flex-shrink-0" />
                     }
                     <div>
-                      <p className={`font-mono text-sm font-bold ${
-                        result.correct ? 'text-nkt-green' : 'text-nkt-red'
-                      }`}>
+                      <p className={`font-mono text-sm font-bold ${result.correct ? 'text-nkt-green' : 'text-nkt-red'}`}>
                         {result.message}
                       </p>
                       {result.correct && (
