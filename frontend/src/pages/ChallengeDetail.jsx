@@ -64,7 +64,24 @@ export default function ChallengeDetail() {
 
   const diffStyle = DIFF_STYLES[challenge.difficulty] || DIFF_STYLES.Easy;
 
-  const downloadUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/challenges/${id}/download`;
+  const handleDownload = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const url = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/challenges/${id}/download`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Erreur téléchargement');
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = challenge.file_name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (err) {
+      alert('Erreur lors du téléchargement');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-nkt-bg bg-grid pt-20 pb-12">
@@ -139,11 +156,9 @@ export default function ChallengeDetail() {
 
             {/* Fichier à télécharger */}
             {challenge.file_name && (
-              <a
-                href={downloadUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center justify-between p-4 bg-nkt-bg border border-nkt-cyan/30 rounded-lg hover:border-nkt-cyan/60 hover:bg-nkt-cyan/5 transition-all group"
+              <button
+                onClick={handleDownload}
+                className="w-full flex items-center justify-between p-4 bg-nkt-bg border border-nkt-cyan/30 rounded-lg hover:border-nkt-cyan/60 hover:bg-nkt-cyan/5 transition-all group"
               >
                 <div className="flex items-center gap-3">
                   <Download size={16} className="text-nkt-cyan flex-shrink-0" />
@@ -159,7 +174,7 @@ export default function ChallengeDetail() {
                 <span className="text-nkt-cyan/40 group-hover:text-nkt-cyan transition-colors font-mono text-sm">
                   →
                 </span>
-              </a>
+              </button>
             )}
 
             {/* Hint */}
