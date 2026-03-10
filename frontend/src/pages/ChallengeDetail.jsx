@@ -66,7 +66,7 @@ export default function ChallengeDetail() {
 
   const handleDownload = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('nkt_token');
       const url = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/challenges/${id}/download`;
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
