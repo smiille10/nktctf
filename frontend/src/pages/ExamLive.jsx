@@ -65,6 +65,24 @@ export default function ExamLive() {
     } catch {}
   }, [id]);
 
+
+  const downloadFile = async (challengeId, fileName) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/challenges/${challengeId}/file`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Erreur téléchargement');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = fileName; a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setMsg('❌ Erreur téléchargement fichier');
+    }
+  };
+
   const submitFlag = async (challengeId) => {
     const flag = (flags[challengeId] || '').trim();
     if (!flag) return;
@@ -272,11 +290,10 @@ export default function ExamLive() {
                 {ch.file_name && (
                   <div className="mb-4">
                     <p className="text-[10px] font-mono text-nkt-muted tracking-widest mb-2">FICHIER</p>
-                    <a href={`${import.meta.env.VITE_API_URL}/admin/challenges/${ch.id}/file`}
-                      target="_blank" rel="noreferrer"
+                    <button onClick={() => downloadFile(ch.id, ch.file_name)}
                       className="inline-flex items-center gap-2 text-xs font-mono text-nkt-cyan border border-nkt-cyan/30 bg-nkt-cyan/5 px-4 py-2 rounded hover:bg-nkt-cyan/10 transition-all">
                       <Download size={13} /> {ch.file_name}
-                    </a>
+                    </button>
                   </div>
                 )}
 
