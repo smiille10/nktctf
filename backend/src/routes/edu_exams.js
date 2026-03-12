@@ -66,6 +66,35 @@ router.post('/join', authMiddleware, async (req, res) => {
   }
 });
 
+
+// GET examens de l'école du prof
+router.get('/my-school', authMiddleware, async (req, res) => {
+  try {
+    // Trouver l'école du prof
+    const school = await pool.query(
+      "SELECT school_id FROM school_members WHERE user_id=$1 AND school_role='teacher'",
+      [req.user.id]
+    );
+    if (!school.rows[0]) return res.status(403).json({ error: 'Vous n\'êtes pas enseignant dans une école' });
+
+    const result = await pool.query(`
+      SELECT e.*,
+        COUNT(DISTINCT ec.challenge_id)::int as challenge_count,
+        COUNT(DISTINCT es.user_id)::int as participant_count
+      FROM exams e
+      LEFT JOIN exam_challenges ec ON ec.exam_id = e.id
+      LEFT JOIN exam_sessions es ON es.exam_id = e.id
+      WHERE e.school_id = $1
+      GROUP BY e.id
+      ORDER BY e.created_at DESC
+    `, [school.rows[0].school_id]);
+
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── ADMIN — Gérer les examens ────────────────────────
 
 // GET tous les examens
@@ -349,45 +378,15 @@ router.post('/:id/finish', authMiddleware, async (req, res) => {
 });
 
 
-// ─── TEACHER — Routes pour les profs ──────────────────
 
-// GET examens de l'école du prof
-router.get('/my-school', authMiddleware, async (req, res) => {
-  try {
-    // Trouver l'école du prof
-    const school = await pool.query(
-      "SELECT school_id FROM school_members WHERE user_id=$1 AND school_role='teacher'",
-      [req.user.id]
-    );
-    if (!school.rows[0]) return res.status(403).json({ error: 'Vous n\'êtes pas enseignant dans une école' });
-
-    const result = await pool.query(`
-      SELECT e.*,
-        COUNT(DISTINCT ec.challenge_id)::int as challenge_count,
-        COUNT(DISTINCT es.user_id)::int as participant_count
-      FROM exams e
-      LEFT JOIN exam_challenges ec ON ec.exam_id = e.id
-      LEFT JOIN exam_sessions es ON es.exam_id = e.id
-      WHERE e.school_id = $1
-      GROUP BY e.id
-      ORDER BY e.created_at DESC
-    `, [school.rows[0].school_id]);
-
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET sessions en cours d'un examen (teacher)
+// GET sessions live d'un examen (teacher + admin)
 router.get('/:id/sessions', authMiddleware, async (req, res) => {
   try {
-    // Vérif que le prof est dans la même école
     const exam = await pool.query('SELECT * FROM exams WHERE id=$1', [req.params.id]);
     if (!exam.rows[0]) return res.status(404).json({ error: 'Examen introuvable' });
 
     const isMember = await pool.query(
-      "SELECT 1 FROM school_members WHERE school_id=$1 AND user_id=$2 AND school_role IN ('teacher')",
+      "SELECT 1 FROM school_members WHERE school_id=$1 AND user_id=$2 AND school_role='teacher'",
       [exam.rows[0].school_id, req.user.id]
     );
     const isAdmin = req.user.role === 'superadmin';

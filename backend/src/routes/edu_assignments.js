@@ -11,6 +11,15 @@ const isSuperAdmin = (req, res, next) => {
   res.status(403).json({ error: 'SuperAdmin requis' });
 };
 
+// GET devoirs de l'école du prof (teacher)
+router.get('/my-school', authMiddleware, async (req, res) => {
+  try {
+    const school = await pool.query(
+      "SELECT school_id FROM school_members WHERE user_id=$1 AND school_role='teacher'",
+      [req.user.id]
+    );
+    if (!school.rows[0]) return res.status(403).json({ error: 'Vous n\'êtes pas enseignant' });
+
 // ─── ADMIN — Gérer les devoirs ────────────────────────
 
 // POST créer un devoir
@@ -130,14 +139,6 @@ router.post('/:id/submissions/:userId/grade', authMiddleware, isSuperAdmin, asyn
 
 
 
-// GET devoirs de l'école du prof (teacher)
-router.get('/my-school', authMiddleware, async (req, res) => {
-  try {
-    const school = await pool.query(
-      "SELECT school_id FROM school_members WHERE user_id=$1 AND school_role='teacher'",
-      [req.user.id]
-    );
-    if (!school.rows[0]) return res.status(403).json({ error: 'Vous n\'êtes pas enseignant' });
 
     const result = await pool.query(`
       SELECT a.*, COUNT(DISTINCT asub.user_id)::int as submission_count

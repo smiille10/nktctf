@@ -243,4 +243,24 @@ router.patch('/users/:id', authMiddleware, isSuperAdmin, async (req, res) => {
   }
 });
 
+
+// GET télécharger le fichier d'un challenge (accessible pendant examen)
+router.get('/challenges/:id/file', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT file_name, file_data FROM challenges WHERE id=$1',
+      [req.params.id]
+    );
+    const ch = result.rows[0];
+    if (!ch || !ch.file_data) return res.status(404).json({ error: 'Fichier introuvable' });
+
+    const buffer = Buffer.from(ch.file_data, 'base64');
+    res.setHeader('Content-Disposition', `attachment; filename="${ch.file_name}"`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.send(buffer);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
