@@ -1,277 +1,247 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Clock, CheckCircle, XCircle, Send, Flag, Trophy, AlertTriangle } from 'lucide-react';
+import { Clock, Flag, CheckCircle, XCircle, AlertTriangle, Trophy } from 'lucide-react';
 import api from '../api';
 
 export default function ExamLive() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const [exam,        setExam]        = useState(null);
-  const [challenges,  setChallenges]  = useState([]);
-  const [timeLeft,    setTimeLeft]    = useState(0);
-  const [loading,     setLoading]     = useState(true);
-  const [flags,       setFlags]       = useState({});   // challengeId → flag input
-  const [results,     setResults]     = useState({});   // challengeId → { correct, message }
-  const [submitting,  setSubmitting]  = useState({});
-  const [finished,    setFinished]    = useState(false);
-  const [finalScore,  setFinalScore]  = useState(null);
-  const [msg,         setMsg]         = useState('');
+  const [phase, setPhase]           = useState('starting');
+  const [exam, setExam]             = useState(null);
+  const [challenges, setChallenges] = useState([]);
+  const [totalPoints, setTotalPoints] = useState(0);
+  const [timeLeft, setTimeLeft]     = useState(0);
+  const [flags, setFlags]           = useState({});
+  const [results, setResults]       = useState({});
+  const [msg, setMsg]               = useState('');
+  const [finishing, setFinishing]   = useState(false);
+  const [finalResult, setFinalResult] = useState(null);
+  const [errorMsg, setErrorMsg]     = useState('');
   const timerRef = useRef(null);
 
-  const loadChallenges = useCallback(async () => {
-    try {
-      const r = await api.get(`/exams/${id}/challenges`);
-      setChallenges(r.data.challenges || []);
-      setTimeLeft(r.data.time_left_seconds || 0);
-      setExam(prev => ({ ...prev, ...r.data.session }));
-    } catch (err) {
-      if (err.response?.data?.error === 'Temps écoulé !') {
-        setFinished(true);
-        setMsg('⏰ Temps écoulé !');
-      }
-    }
-  }, [id]);
-
+  // 1. Démarrer la session au chargement
   useEffect(() => {
-    const init = async () => {
-      setLoading(true);
+    const start = async () => {
       try {
-        // Récupère les infos de l'examen
-        const r = await api.get(`/exams/${id}/challenges`);
-        setChallenges(r.data.challenges || []);
-        setTimeLeft(r.data.time_left_seconds || 0);
-        setExam(r.data);
+        const r = await api.post(`/exams/${id}/start`);
+        setExam(r.data.exam);
+
+        if (r.data.session.status === 'finished' || r.data.session.status === 'timed_out') {
+          setPhase('finished');
+          return;
+        }
+
+        const cr = await api.get(`/exams/${id}/challenges`);
+        setChallenges(cr.data.challenges || []);
+        setTotalPoints(cr.data.total_points || 0);
+        setTimeLeft(cr.data.time_left_seconds || 0);
+        setPhase('active');
       } catch (err) {
-        setMsg('❌ ' + (err.response?.data?.error || 'Examen introuvable'));
-      } finally {
-        setLoading(false);
+        setErrorMsg(err.response?.data?.error || "Erreur démarrage examen");
+        setPhase('error');
       }
     };
-    init();
+    start();
   }, [id]);
 
-  // ── Timer ──
+  // 2. Timer countdown
   useEffect(() => {
-    if (timeLeft <= 0 || finished) return;
+    if (phase !== 'active') return;
     timerRef.current = setInterval(() => {
-      setTimeLeft(t => {
-        if (t <= 1) {
-          clearInterval(timerRef.current);
-          handleFinish(true);
-          return 0;
-        }
-        return t - 1;
+      setTimeLeft(prev => {
+        if (prev <= 1) { clearInterval(timerRef.current); finishExam(true); return 0; }
+        return prev - 1;
       });
     }, 1000);
     return () => clearInterval(timerRef.current);
-  }, [timeLeft > 0, finished]);
+  }, [phase]);
 
-  const formatTime = (s) => {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = s % 60;
-    if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-    return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-  };
+  const refreshChallenges = useCallback(async () => {
+    try {
+      const cr = await api.get(`/exams/${id}/challenges`);
+      setChallenges(cr.data.challenges || []);
+    } catch {}
+  }, [id]);
 
-  const timerColor = timeLeft < 300 ? '#ff4560' : timeLeft < 900 ? '#ffd700' : '#00ff88';
-
-  const handleSubmitFlag = async (challengeId) => {
-    const flag = flags[challengeId]?.trim();
+  const submitFlag = async (challengeId) => {
+    const flag = (flags[challengeId] || '').trim();
     if (!flag) return;
-    setSubmitting(prev => ({ ...prev, [challengeId]: true }));
+    setMsg('');
     try {
       const r = await api.post(`/exams/${id}/submit`, { challenge_id: challengeId, flag });
       setResults(prev => ({ ...prev, [challengeId]: r.data }));
-      if (r.data.correct) {
-        setChallenges(prev => prev.map(c => c.id === challengeId ? { ...c, solved: true } : c));
-      }
+      setMsg(r.data.message);
+      if (r.data.correct) await refreshChallenges();
     } catch (err) {
-      setResults(prev => ({ ...prev, [challengeId]: { correct: false, message: err.response?.data?.error || 'Erreur' } }));
-    } finally {
-      setSubmitting(prev => ({ ...prev, [challengeId]: false }));
+      setMsg(err.response?.data?.error || '❌ Erreur soumission');
     }
   };
 
-  const handleFinish = async (auto = false) => {
-    if (!auto && !confirm('Terminer l\'examen ? Tu ne pourras plus soumettre de flags.')) return;
+  const finishExam = async (auto = false) => {
+    if (finishing) return;
+    if (!auto && !confirm('Terminer l\'examen maintenant ?')) return;
+    setFinishing(true);
     clearInterval(timerRef.current);
     try {
       const r = await api.post(`/exams/${id}/finish`);
-      setFinalScore(r.data);
-      setFinished(true);
+      setFinalResult(r.data);
+      setPhase('finished');
     } catch (err) {
-      setMsg('❌ ' + (err.response?.data?.error || 'Erreur'));
+      setMsg(err.response?.data?.error || 'Erreur fin examen');
+      setFinishing(false);
     }
   };
 
-  const solvedCount = challenges.filter(c => c.solved).length;
+  const fmt = (s) => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+  const solved = challenges.filter(c => c.solved).length;
+  const score  = challenges.filter(c => c.solved).reduce((sum, c) => sum + (c.points || 0), 0);
+  const urgent = timeLeft < 300 && timeLeft > 0;
 
-  if (loading) return (
+  if (phase === 'starting') return (
     <div className="min-h-screen bg-nkt-bg flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-nkt-green border-t-transparent rounded-full animate-spin" />
+      <div className="text-center">
+        <div className="w-8 h-8 border-2 border-nkt-green border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="font-mono text-sm text-nkt-muted">Démarrage de l'examen...</p>
+      </div>
     </div>
   );
 
-  // ── Écran résultats ──
-  if (finished) return (
-    <div className="min-h-screen bg-nkt-bg bg-grid flex items-center justify-center px-4">
-      <div className="bg-nkt-card border border-nkt-border rounded-xl p-8 w-full max-w-md text-center relative overflow-hidden">
+  if (phase === 'error') return (
+    <div className="min-h-screen bg-nkt-bg flex items-center justify-center p-4">
+      <div className="bg-nkt-card border border-nkt-red/30 rounded-xl p-8 text-center max-w-md">
+        <XCircle size={48} className="text-nkt-red mx-auto mb-4" />
+        <h2 className="font-mono text-lg font-bold text-nkt-text mb-2">Accès refusé</h2>
+        <p className="font-mono text-sm text-nkt-muted mb-6">{errorMsg}</p>
+        <button onClick={() => navigate('/my-school')} className="nkt-btn nkt-btn-solid px-6 py-3 rounded font-mono text-sm">
+          ← Retour à Mon École
+        </button>
+      </div>
+    </div>
+  );
+
+  if (phase === 'finished') return (
+    <div className="min-h-screen bg-nkt-bg flex items-center justify-center p-4">
+      <div className="bg-nkt-card border border-nkt-green/30 rounded-xl p-8 text-center max-w-md w-full relative overflow-hidden">
         <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-nkt-green to-transparent" />
-        <Trophy size={48} className="mx-auto mb-4 text-yellow-400" />
+        <Trophy size={48} className="text-yellow-400 mx-auto mb-4" />
         <h2 className="font-display text-2xl font-bold text-nkt-text mb-2">Examen Terminé !</h2>
-        {finalScore && (
+        {finalResult ? (
           <>
-            <p className="font-display text-5xl font-bold text-nkt-green my-6">{finalScore.session?.score || 0}</p>
-            <p className="font-mono text-sm text-nkt-muted mb-2">points obtenus</p>
-            <p className="font-mono text-lg font-bold text-nkt-text">{finalScore.percentage}%</p>
-            {finalScore.certificate && (
-              <div className="mt-4 p-3 bg-yellow-400/10 border border-yellow-400/30 rounded-lg">
-                <p className="font-mono text-sm text-yellow-400 font-bold">🏅 Certificat obtenu !</p>
-                <p className="font-mono text-xs text-nkt-muted mt-1">Score ≥ 70%</p>
+            <div className="my-6">
+              <p className="font-display text-5xl font-bold text-nkt-green">{finalResult.percentage}%</p>
+              <p className="font-mono text-sm text-nkt-muted mt-1">score final</p>
+            </div>
+            {finalResult.certificate && (
+              <div className="bg-yellow-400/10 border border-yellow-400/30 rounded-lg p-3 mb-4">
+                <p className="font-mono text-sm text-yellow-400 font-bold">🏅 Certificat débloqué !</p>
               </div>
             )}
           </>
+        ) : (
+          <p className="font-mono text-sm text-nkt-muted my-6">Résultats disponibles dans Mon École</p>
         )}
-        {msg && <p className="font-mono text-sm text-yellow-400 mt-2">{msg}</p>}
-        <div className="flex gap-3 mt-6">
-          <button onClick={() => navigate('/my-school')}
-            className="flex-1 nkt-btn nkt-btn-solid py-3 rounded-lg font-mono text-sm font-bold">
-            MON ESPACE
-          </button>
-          <button onClick={() => navigate('/learn')}
-            className="flex-1 nkt-btn py-3 rounded-lg font-mono text-sm font-bold">
-            COURS
-          </button>
-        </div>
+        <button onClick={() => navigate('/my-school')} className="nkt-btn nkt-btn-solid px-8 py-3 rounded font-mono text-sm w-full">
+          ← Retour à Mon École
+        </button>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-nkt-bg bg-grid pt-0 pb-12">
-
-      {/* ── Barre fixe timer ── */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-nkt-card/95 backdrop-blur border-b border-nkt-border">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div className="min-h-screen bg-nkt-bg bg-grid pb-12">
+      {/* Barre top fixe */}
+      <div className="fixed top-0 left-0 right-0 z-40 bg-nkt-card/95 backdrop-blur border-b border-nkt-border h-16">
+        <div className="max-w-5xl mx-auto px-4 h-full flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-mono text-nkt-muted tracking-widest">EXAMEN EN COURS</p>
-            <p className="font-mono text-sm font-bold text-nkt-text">{solvedCount}/{challenges.length} résolus</p>
+            <p className="font-mono text-[10px] text-nkt-muted tracking-widest">EXAMEN EN COURS</p>
+            <p className="font-mono text-sm font-bold text-nkt-text">{exam?.title}</p>
           </div>
-
-          {/* Timer */}
-          <div className="flex items-center gap-2">
-            <Clock size={16} style={{ color: timerColor }} />
-            <span className="font-mono text-2xl font-bold tabular-nums" style={{ color: timerColor }}>
-              {formatTime(timeLeft)}
-            </span>
+          <div className="flex items-center gap-4">
+            <div className="text-center hidden sm:block">
+              <p className="font-mono text-[10px] text-nkt-muted">RÉSOLUS</p>
+              <p className="font-mono font-bold text-nkt-green">{solved}/{challenges.length}</p>
+            </div>
+            <div className="text-center hidden sm:block">
+              <p className="font-mono text-[10px] text-nkt-muted">SCORE</p>
+              <p className="font-display font-bold text-nkt-green">{score}/{totalPoints}</p>
+            </div>
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${urgent ? 'border-nkt-red/40 bg-nkt-red/10' : 'border-nkt-border'}`}>
+              <Clock size={13} className={urgent ? 'text-nkt-red' : 'text-nkt-muted'} />
+              <span className={`font-mono text-base font-bold ${urgent ? 'text-nkt-red' : 'text-nkt-text'}`}>{fmt(timeLeft)}</span>
+            </div>
+            <button onClick={() => finishExam(false)} disabled={finishing}
+              className="px-4 py-2 rounded border border-nkt-red/40 text-nkt-red hover:bg-nkt-red/10 transition-all font-mono text-xs font-bold disabled:opacity-50">
+              {finishing ? '...' : 'TERMINER'}
+            </button>
           </div>
-
-          <button onClick={() => handleFinish(false)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-nkt-red/30 text-nkt-red bg-nkt-red/5 hover:bg-nkt-red/10 transition-all text-xs font-mono font-bold">
-            <Flag size={13} /> TERMINER
-          </button>
-        </div>
-
-        {/* Barre de progression */}
-        <div className="h-0.5 bg-nkt-bg">
-          <div className="h-full transition-all duration-1000" style={{ width: `${(timeLeft / (exam?.duration_minutes * 60 || 3600)) * 100}%`, background: timerColor }} />
         </div>
       </div>
 
-      {/* ── Challenges ── */}
-      <div className="max-w-5xl mx-auto px-4 pt-24 space-y-4">
-
+      <div className="max-w-5xl mx-auto px-4 pt-20">
         {msg && (
-          <div className="p-3 rounded border bg-nkt-red/10 border-nkt-red/30 text-nkt-red font-mono text-sm flex items-center gap-2">
-            <AlertTriangle size={14} /> {msg}
+          <div className={`mb-4 p-3 rounded border font-mono text-sm ${msg.includes('🎉') || msg.includes('Correct') ? 'bg-nkt-green/10 border-nkt-green/30 text-nkt-green' : 'bg-nkt-red/10 border-nkt-red/30 text-nkt-red'}`}>
+            {msg}
           </div>
         )}
 
-        {challenges.map((ch, i) => (
-          <div key={ch.id} className={`bg-nkt-card border rounded-xl overflow-hidden transition-all ${
-            ch.solved ? 'border-nkt-green/40' : 'border-nkt-border'
-          }`}>
-            {ch.solved && <div className="h-[2px] bg-gradient-to-r from-transparent via-nkt-green to-transparent" />}
-
-            <div className="p-5">
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    <span className="text-[10px] font-mono text-nkt-muted border border-nkt-border px-2 py-0.5 rounded">
-                      #{i + 1}
-                    </span>
-                    <span className="text-[10px] font-mono font-bold text-nkt-muted">{ch.category}</span>
-                    {ch.solved && (
-                      <span className="flex items-center gap-1 text-[10px] font-mono text-nkt-green border border-nkt-green/30 bg-nkt-green/10 px-2 py-0.5 rounded">
-                        <CheckCircle size={10} /> RÉSOLU
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="font-mono text-base font-bold text-nkt-text">{ch.title}</h3>
-                  <p className="font-mono text-sm text-nkt-muted mt-2 leading-relaxed whitespace-pre-wrap">{ch.description}</p>
-                  {ch.hint && (
-                    <p className="font-mono text-xs text-yellow-400/70 mt-2">💡 {ch.hint}</p>
-                  )}
+        {challenges.length === 0 ? (
+          <div className="text-center py-20">
+            <AlertTriangle size={40} className="text-nkt-muted/30 mx-auto mb-3" />
+            <p className="font-mono text-sm text-nkt-muted">Aucun challenge dans cet examen</p>
+          </div>
+        ) : challenges.map((ch, i) => (
+          <div key={ch.id} className={`bg-nkt-card border rounded-xl p-6 mb-4 transition-all ${ch.solved ? 'border-nkt-green/40 bg-nkt-green/5' : 'border-nkt-border'}`}>
+            <div className="flex items-start justify-between gap-4 mb-3">
+              <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-lg border flex items-center justify-center font-mono text-xs font-bold flex-shrink-0 ${ch.solved ? 'border-nkt-green bg-nkt-green/20 text-nkt-green' : 'border-nkt-border text-nkt-muted'}`}>
+                  {ch.solved ? <CheckCircle size={14} /> : `#${i+1}`}
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="font-display text-2xl font-bold text-nkt-green">{ch.points}</p>
-                  <p className="text-[10px] font-mono text-nkt-muted">pts</p>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-sm font-bold text-nkt-text">{ch.title}</span>
+                    <span className="text-[10px] font-mono border border-nkt-border text-nkt-muted px-2 py-0.5 rounded">{ch.category}</span>
+                    {ch.solved && <span className="text-[10px] font-mono text-nkt-green border border-nkt-green/30 px-2 py-0.5 rounded bg-nkt-green/10">✓ RÉSOLU</span>}
+                  </div>
                 </div>
               </div>
-
-              {/* Submit flag */}
-              {!ch.solved && (
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <div className="flex-1 relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-nkt-green font-mono text-sm">›</span>
-                      <input
-                        className="nkt-input w-full pl-8 pr-4 py-2.5 rounded-lg text-sm font-mono"
-                        placeholder="NKTCTF{...}"
-                        value={flags[ch.id] || ''}
-                        onChange={e => setFlags(prev => ({ ...prev, [ch.id]: e.target.value }))}
-                        onKeyDown={e => e.key === 'Enter' && handleSubmitFlag(ch.id)}
-                        disabled={submitting[ch.id]}
-                      />
-                    </div>
-                    <button onClick={() => handleSubmitFlag(ch.id)}
-                      disabled={submitting[ch.id] || !flags[ch.id]?.trim()}
-                      className="nkt-btn nkt-btn-solid px-5 py-2.5 rounded-lg text-sm font-mono font-bold flex items-center gap-2 disabled:opacity-50">
-                      {submitting[ch.id]
-                        ? <span className="w-4 h-4 border-2 border-nkt-bg border-t-transparent rounded-full animate-spin" />
-                        : <><Send size={13} /> SUBMIT</>
-                      }
-                    </button>
-                  </div>
-
-                  {results[ch.id] && (
-                    <div className={`flex items-center gap-2 p-3 rounded-lg border text-sm font-mono ${
-                      results[ch.id].correct
-                        ? 'bg-nkt-green/10 border-nkt-green/30 text-nkt-green'
-                        : 'bg-nkt-red/10 border-nkt-red/30 text-nkt-red'
-                    }`}>
-                      {results[ch.id].correct ? <CheckCircle size={14} /> : <XCircle size={14} />}
-                      {results[ch.id].message}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {ch.solved && (
-                <div className="flex items-center gap-2 p-3 rounded-lg border bg-nkt-green/5 border-nkt-green/20 text-nkt-green text-sm font-mono">
-                  <CheckCircle size={14} /> Challenge résolu ! +{ch.points} pts
-                </div>
-              )}
+              <div className="text-right flex-shrink-0">
+                <p className="font-display text-xl font-bold text-nkt-green">{ch.points}</p>
+                <p className="text-[10px] font-mono text-nkt-muted">pts</p>
+              </div>
             </div>
+
+            <p className="font-mono text-sm text-nkt-muted/80 mb-4 whitespace-pre-wrap leading-relaxed">{ch.description}</p>
+
+            {ch.hint && (
+              <div className="bg-yellow-400/5 border border-yellow-400/20 rounded-lg px-4 py-2 mb-4">
+                <p className="font-mono text-xs text-yellow-400">💡 {ch.hint}</p>
+              </div>
+            )}
+
+            {!ch.solved && (
+              <div className="flex gap-3 mt-4">
+                <div className="relative flex-1">
+                  <Flag size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-nkt-muted" />
+                  <input className="nkt-input w-full pl-8 pr-4 py-2.5 rounded text-sm font-mono"
+                    placeholder="NKTCTF{...}"
+                    value={flags[ch.id] || ''}
+                    onChange={e => setFlags(p => ({ ...p, [ch.id]: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && submitFlag(ch.id)} />
+                </div>
+                <button onClick={() => submitFlag(ch.id)} className="nkt-btn nkt-btn-solid px-5 py-2.5 rounded text-sm font-mono font-bold">
+                  SOUMETTRE
+                </button>
+              </div>
+            )}
+
+            {results[ch.id] && !ch.solved && (
+              <p className={`mt-2 font-mono text-xs flex items-center gap-1 ${results[ch.id].correct ? 'text-nkt-green' : 'text-nkt-red'}`}>
+                {results[ch.id].correct ? <CheckCircle size={12} /> : <XCircle size={12} />} {results[ch.id].message}
+              </p>
+            )}
           </div>
         ))}
-
-        <button onClick={() => handleFinish(false)}
-          className="w-full py-4 rounded-xl border border-nkt-red/30 text-nkt-red bg-nkt-red/5 hover:bg-nkt-red/10 transition-all font-mono font-bold flex items-center justify-center gap-2">
-          <Flag size={16} /> TERMINER L'EXAMEN
-        </button>
       </div>
     </div>
   );
