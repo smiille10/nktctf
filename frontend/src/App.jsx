@@ -16,6 +16,11 @@ import Profile from './pages/Profile';
 import Account from './pages/Account';
 import Teams from './pages/Teams';
 import Landing from './pages/Landing';
+import JoinSchool   from './pages/JoinSchool';
+import MySchool     from './pages/MySchool';
+import Learn        from './pages/Learn';
+import CourseDetail from './pages/CourseDetail';
+import ExamLive     from './pages/ExamLive';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -47,33 +52,33 @@ function AppRoutes() {
     <>
       {user && <Navbar />}
       <Routes>
-        {/* Landing page — visible si pas connecté */}
-        <Route path="/" element={
-          user ? <Navigate to="/dashboard" replace /> : <Landing />
-        } />
+        <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Landing />} />
 
-        <Route path="/login"           element={<PublicRoute><Login /></PublicRoute>} />
-        <Route path="/register"        element={<PublicRoute><Register /></PublicRoute>} />
-        <Route path="/verify-email"    element={<VerifyEmail />} />
+        <Route path="/login"             element={<PublicRoute><Login /></PublicRoute>} />
+        <Route path="/register"          element={<PublicRoute><Register /></PublicRoute>} />
+        <Route path="/verify-email"      element={<VerifyEmail />} />
 
-        <Route path="/dashboard"       element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-        <Route path="/challenges"      element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
-        <Route path="/challenges/:id"  element={<ProtectedRoute><ChallengeDetail /></ProtectedRoute>} />
-        <Route path="/scoreboard"      element={<ProtectedRoute><Scoreboard /></ProtectedRoute>} />
-        <Route path="/events"          element={<ProtectedRoute><Events /></ProtectedRoute>} />
-        <Route path="/pricing"         element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
-        <Route path="/payment/success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
-        <Route path="/teams"           element={<ProtectedRoute><Teams /></ProtectedRoute>} />
-        <Route path="/profile"         element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/dashboard"         element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/challenges"        element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
+        <Route path="/challenges/:id"    element={<ProtectedRoute><ChallengeDetail /></ProtectedRoute>} />
+        <Route path="/scoreboard"        element={<ProtectedRoute><Scoreboard /></ProtectedRoute>} />
+        <Route path="/events"            element={<ProtectedRoute><Events /></ProtectedRoute>} />
+        <Route path="/pricing"           element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
+        <Route path="/payment/success"   element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
+        <Route path="/teams"             element={<ProtectedRoute><Teams /></ProtectedRoute>} />
+        <Route path="/profile"           element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/profile/:username" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-        <Route path="/account"         element={<ProtectedRoute><Account /></ProtectedRoute>} />
+        <Route path="/account"           element={<ProtectedRoute><Account /></ProtectedRoute>} />
+
+        {/* ── EDU ── */}
+        <Route path="/join-school"       element={<ProtectedRoute><JoinSchool /></ProtectedRoute>} />
+        <Route path="/my-school"         element={<ProtectedRoute><MySchool /></ProtectedRoute>} />
+        <Route path="/learn"             element={<ProtectedRoute><Learn /></ProtectedRoute>} />
+        <Route path="/learn/:id"         element={<ProtectedRoute><CourseDetail /></ProtectedRoute>} />
+        <Route path="/exam/:id/live"     element={<ProtectedRoute><ExamLive /></ProtectedRoute>} />
 
         <Route path="/admin" element={
-          <ProtectedRoute>
-            <AdminRoute>
-              <Admin />
-            </AdminRoute>
-          </ProtectedRoute>
+          <ProtectedRoute><AdminRoute><Admin /></AdminRoute></ProtectedRoute>
         } />
 
         <Route path="*" element={<Navigate to="/" replace />} />
