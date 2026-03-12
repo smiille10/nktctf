@@ -7,8 +7,9 @@ import {
   Plus, Trash2, ToggleLeft, ToggleRight,
   Upload, X, Users, Database, Shield,
   Activity, Target, Zap, Calendar, Edit2, Save,
-  MessageSquare, Crown, GraduationCap, RefreshCw, Copy
+  MessageSquare, Crown, GraduationCap, RefreshCw, Copy, BookOpen
 } from 'lucide-react';
+import AdminCourses from '../components/AdminCourses';
 
 const CATEGORIES    = ['WEB', 'FORENSICS', 'CRYPTO', 'OSINT', 'MISC'];
 const DIFFICULTIES  = ['Easy', 'Medium', 'Hard'];
@@ -39,6 +40,7 @@ const TABS = [
   { id: 'challenges', label: 'CHALLENGES', icon: Target        },
   { id: 'events',     label: 'EVENTS',     icon: Calendar      },
   { id: 'schools',    label: 'SCHOOLS',    icon: GraduationCap },
+  { id: 'courses',    label: 'COURSES',    icon: BookOpen      },
   { id: 'users',      label: 'USERS',      icon: Users         },
   { id: 'teams',      label: 'TEAMS',      icon: Shield        },
   { id: 'database',   label: 'DATABASE',   icon: Database      },
@@ -399,7 +401,7 @@ export default function Admin() {
   };
 
   const visibleTabs = TABS.filter(t =>
-    (t.id !== 'users' && t.id !== 'database' && t.id !== 'teams' && t.id !== 'schools') || isSuperAdmin
+    (t.id !== 'users' && t.id !== 'database' && t.id !== 'teams' && t.id !== 'schools' && t.id !== 'courses') || isSuperAdmin
   );
 
   // ══════════════════════════════════════════
@@ -956,6 +958,11 @@ export default function Admin() {
               ))}
             </div>
           </div>
+        )}
+
+        {/* ══════════════ COURSES ══════════════ */}
+        {tab === 'courses' && isSuperAdmin && (
+          <AdminCourses setMsg={setMsg} />
         )}
 
         {/* ══════════════ USERS ══════════════ */}
