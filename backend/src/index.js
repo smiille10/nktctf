@@ -5,7 +5,7 @@ const fs      = require('fs');
 
 const app = express();
 
-app.set('trust proxy', 1); // ← Fix Railway proxy
+app.set('trust proxy', 1);
 
 // ── Middleware ──
 app.use(cors({
@@ -22,22 +22,26 @@ app.use(express.urlencoded({ extended: true }));
 
 // ── Uploads statiques ──
 const uploadsDir = path.join(__dirname, '../uploads');
-
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
-
 app.use('/uploads', express.static(uploadsDir));
 
 // ── Routes ──
 try {
-  app.use('/api/auth',       require('./routes/auth'));
-  app.use('/api/challenges', require('./routes/challenges'));
-  app.use('/api/admin',      require('./routes/admin'));
-  app.use('/api/events',     require('./routes/events'));
-  app.use('/api/scoreboard', require('./routes/scoreboard'));
-  app.use('/api/profile',    require('./routes/profile'));
-  app.use('/api/teams',      require('./routes/teams'));
+  app.use('/api/auth',        require('./routes/auth'));
+  app.use('/api/challenges',  require('./routes/challenges'));
+  app.use('/api/admin',       require('./routes/admin'));
+  app.use('/api/events',      require('./routes/events'));
+  app.use('/api/scoreboard',  require('./routes/scoreboard'));
+  app.use('/api/profile',     require('./routes/profile'));
+  app.use('/api/teams',       require('./routes/teams'));
+
+  // ── EDU Routes ──
+  app.use('/api/schools',     require('./routes/edu_schools'));
+  app.use('/api/courses',     require('./routes/edu_courses'));
+  app.use('/api/exams',       require('./routes/edu_exams'));
+  app.use('/api/assignments', require('./routes/edu_assignments'));
 } catch (err) {
   console.error('❌ Route loading error:', err.message);
 }
@@ -60,7 +64,6 @@ app.use((err, req, res, next) => {
 
 // ── Start ──
 const PORT = process.env.PORT || 5000;
-
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
