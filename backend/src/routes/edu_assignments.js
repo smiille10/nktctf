@@ -29,6 +29,23 @@ router.post('/', authMiddleware, isSuperAdmin, async (req, res) => {
   }
 });
 
+// GET tous les devoirs (superadmin) — DOIT être avant /school/:schoolId
+router.get('/school/all', authMiddleware, isSuperAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT a.*,
+        COUNT(DISTINCT asub.user_id) as submission_count
+      FROM assignments a
+      LEFT JOIN assignment_submissions asub ON asub.assignment_id = a.id
+      GROUP BY a.id
+      ORDER BY a.created_at DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET devoirs d'une école
 router.get('/school/:schoolId', authMiddleware, async (req, res) => {
   try {
@@ -112,17 +129,25 @@ router.post('/:id/submissions/:userId/grade', authMiddleware, isSuperAdmin, asyn
 });
 
 
-// GET tous les devoirs (superadmin)
-router.get('/school/all', authMiddleware, isSuperAdmin, async (req, res) => {
+
+// GET devoirs de l'école du prof (teacher)
+router.get('/my-school', authMiddleware, async (req, res) => {
   try {
+    const school = await pool.query(
+      "SELECT school_id FROM school_members WHERE user_id=$1 AND school_role='teacher'",
+      [req.user.id]
+    );
+    if (!school.rows[0]) return res.status(403).json({ error: 'Vous n\'êtes pas enseignant' });
+
     const result = await pool.query(`
-      SELECT a.*,
-        COUNT(DISTINCT asub.user_id) as submission_count
+      SELECT a.*, COUNT(DISTINCT asub.user_id)::int as submission_count
       FROM assignments a
       LEFT JOIN assignment_submissions asub ON asub.assignment_id = a.id
+      WHERE a.school_id = $1
       GROUP BY a.id
       ORDER BY a.created_at DESC
-    `);
+    `, [school.rows[0].school_id]);
+
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });

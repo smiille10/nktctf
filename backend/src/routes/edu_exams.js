@@ -348,4 +348,66 @@ router.post('/:id/finish', authMiddleware, async (req, res) => {
   }
 });
 
+
+// ─── TEACHER — Routes pour les profs ──────────────────
+
+// GET examens de l'école du prof
+router.get('/my-school', authMiddleware, async (req, res) => {
+  try {
+    // Trouver l'école du prof
+    const school = await pool.query(
+      "SELECT school_id FROM school_members WHERE user_id=$1 AND school_role='teacher'",
+      [req.user.id]
+    );
+    if (!school.rows[0]) return res.status(403).json({ error: 'Vous n\'êtes pas enseignant dans une école' });
+
+    const result = await pool.query(`
+      SELECT e.*,
+        COUNT(DISTINCT ec.challenge_id)::int as challenge_count,
+        COUNT(DISTINCT es.user_id)::int as participant_count
+      FROM exams e
+      LEFT JOIN exam_challenges ec ON ec.exam_id = e.id
+      LEFT JOIN exam_sessions es ON es.exam_id = e.id
+      WHERE e.school_id = $1
+      GROUP BY e.id
+      ORDER BY e.created_at DESC
+    `, [school.rows[0].school_id]);
+
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET sessions en cours d'un examen (teacher)
+router.get('/:id/sessions', authMiddleware, async (req, res) => {
+  try {
+    // Vérif que le prof est dans la même école
+    const exam = await pool.query('SELECT * FROM exams WHERE id=$1', [req.params.id]);
+    if (!exam.rows[0]) return res.status(404).json({ error: 'Examen introuvable' });
+
+    const isMember = await pool.query(
+      "SELECT 1 FROM school_members WHERE school_id=$1 AND user_id=$2 AND school_role IN ('teacher')",
+      [exam.rows[0].school_id, req.user.id]
+    );
+    const isAdmin = req.user.role === 'superadmin';
+    if (!isMember.rows[0] && !isAdmin) return res.status(403).json({ error: 'Accès refusé' });
+
+    const result = await pool.query(`
+      SELECT es.*, u.username, u.email,
+        COUNT(DISTINCT esub.challenge_id) FILTER (WHERE esub.is_correct) as solved_count
+      FROM exam_sessions es
+      JOIN users u ON u.id = es.user_id
+      LEFT JOIN exam_submissions esub ON esub.session_id = es.id
+      WHERE es.exam_id = $1
+      GROUP BY es.id, u.username, u.email
+      ORDER BY es.score DESC
+    `, [req.params.id]);
+
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

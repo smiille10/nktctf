@@ -20,7 +20,8 @@ import JoinSchool   from './pages/JoinSchool';
 import MySchool     from './pages/MySchool';
 import Learn        from './pages/Learn';
 import CourseDetail from './pages/CourseDetail';
-import ExamLive     from './pages/ExamLive';
+import ExamLive          from './pages/ExamLive';
+import TeacherDashboard  from './pages/TeacherDashboard';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -76,6 +77,7 @@ function AppRoutes() {
         <Route path="/learn"             element={<ProtectedRoute><Learn /></ProtectedRoute>} />
         <Route path="/learn/:id"         element={<ProtectedRoute><CourseDetail /></ProtectedRoute>} />
         <Route path="/exam/:id/live"     element={<ProtectedRoute><ExamLive /></ProtectedRoute>} />
+        <Route path="/teacher"            element={<ProtectedRoute><TeacherDashboard /></ProtectedRoute>} />
 
         <Route path="/admin" element={
           <ProtectedRoute><AdminRoute><Admin /></AdminRoute></ProtectedRoute>
