@@ -75,10 +75,10 @@ export default function AdminExams({ setMsg }) {
   const handleToggleStatus = async (exam) => {
     const newStatus = exam.status === 'active' ? 'draft' : 'active';
     try {
-      await api.put(`/exams/${exam.id}`, { ...exam, status: newStatus });
+      await api.patch(`/exams/${exam.id}/status`, { status: newStatus });
       setMsg(`✅ Examen ${newStatus === 'active' ? 'activé' : 'désactivé'}`);
       await refresh();
-    } catch { setMsg('❌ Erreur'); }
+    } catch (err) { setMsg('❌ ' + (err.response?.data?.error || 'Erreur')); }
   };
 
   const viewResults = async (exam) => {

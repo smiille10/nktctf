@@ -170,6 +170,25 @@ router.put('/:id', authMiddleware, isSuperAdmin, async (req, res) => {
   }
 });
 
+
+// PATCH activer/désactiver un examen (status seulement)
+router.patch('/:id/status', authMiddleware, isSuperAdmin, async (req, res) => {
+  const { status } = req.body;
+  if (!['active', 'draft', 'archived'].includes(status)) {
+    return res.status(400).json({ error: 'Status invalide (active, draft, archived)' });
+  }
+  try {
+    const result = await pool.query(
+      'UPDATE exams SET status=$1 WHERE id=$2 RETURNING *',
+      [status, req.params.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Examen introuvable' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // DELETE supprimer un examen
 router.delete('/:id', authMiddleware, isSuperAdmin, async (req, res) => {
   try {
