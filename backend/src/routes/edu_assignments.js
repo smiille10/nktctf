@@ -111,4 +111,22 @@ router.post('/:id/submissions/:userId/grade', authMiddleware, isSuperAdmin, asyn
   }
 });
 
+
+// GET tous les devoirs (superadmin)
+router.get('/school/all', authMiddleware, isSuperAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT a.*,
+        COUNT(DISTINCT asub.user_id) as submission_count
+      FROM assignments a
+      LEFT JOIN assignment_submissions asub ON asub.assignment_id = a.id
+      GROUP BY a.id
+      ORDER BY a.created_at DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
