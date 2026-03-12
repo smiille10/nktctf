@@ -7,7 +7,8 @@ import {
   Plus, Trash2, ToggleLeft, ToggleRight,
   Upload, X, Users, Database, Shield,
   Activity, Target, Zap, Calendar, Edit2, Save,
-  MessageSquare, Crown, GraduationCap, RefreshCw, Copy, BookOpen
+  MessageSquare, Crown, GraduationCap, RefreshCw, Copy, BookOpen,
+  ChevronDown, ChevronRight, UserCheck
 } from 'lucide-react';
 import AdminCourses from '../components/AdminCourses';
 
@@ -27,6 +28,11 @@ const ROLE_STYLES = {
   superadmin: 'text-nkt-green border-nkt-green/40 bg-nkt-green/10',
   manager:    'text-nkt-cyan border-nkt-cyan/40 bg-nkt-cyan/10',
   user:       'text-nkt-muted border-nkt-border bg-transparent',
+};
+
+const MEMBER_ROLE_COLORS = {
+  teacher: 'text-nkt-cyan border-nkt-cyan/40 bg-nkt-cyan/10',
+  student: 'text-nkt-muted border-nkt-border bg-transparent',
 };
 
 const STATUS_STYLES = {
@@ -99,6 +105,11 @@ export default function Admin() {
   const [showSchoolForm, setShowSchoolForm] = useState(false);
   const [editingSchool,  setEditingSchool]  = useState(null);
   const [schoolForm,     setSchoolForm]     = useState(EMPTY_SCHOOL);
+
+  // ── school members ──
+  const [expandedSchool,  setExpandedSchool]  = useState(null);
+  const [schoolMembers,   setSchoolMembers]   = useState({});
+  const [loadingMembers,  setLoadingMembers]  = useState(false);
 
   // ── teams admin ──
   const [adminTeams,        setAdminTeams]        = useState([]);
@@ -183,6 +194,51 @@ export default function Admin() {
         });
     }
   }, [tab, dbTable, isSuperAdmin]);
+
+  // ══════════════ SCHOOL MEMBERS ══════════════
+
+  const toggleSchoolMembers = async (schoolId) => {
+    if (expandedSchool === schoolId) {
+      setExpandedSchool(null);
+      return;
+    }
+    setExpandedSchool(schoolId);
+    if (schoolMembers[schoolId]) return; // déjà chargé
+    setLoadingMembers(true);
+    try {
+      const r = await api.get(`/schools/${schoolId}/members`);
+      setSchoolMembers(prev => ({ ...prev, [schoolId]: r.data }));
+    } catch (err) {
+      setMsg('❌ Erreur chargement membres');
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  const handleChangeMemberRole = async (schoolId, userId, newRole) => {
+    try {
+      await api.put(`/schools/${schoolId}/members/${userId}/role`, { role: newRole });
+      // Refresh membres
+      const r = await api.get(`/schools/${schoolId}/members`);
+      setSchoolMembers(prev => ({ ...prev, [schoolId]: r.data }));
+      setMsg(`✅ Rôle mis à jour → ${newRole}`);
+    } catch (err) {
+      setMsg('❌ ' + (err.response?.data?.error || 'Erreur'));
+    }
+  };
+
+  const handleRemoveMember = async (schoolId, userId) => {
+    if (!confirm('Retirer ce membre de l\'école ?')) return;
+    try {
+      await api.delete(`/schools/${schoolId}/members/${userId}`);
+      const r = await api.get(`/schools/${schoolId}/members`);
+      setSchoolMembers(prev => ({ ...prev, [schoolId]: r.data }));
+      await refreshSchools();
+      setMsg('✅ Membre retiré');
+    } catch (err) {
+      setMsg('❌ Erreur');
+    }
+  };
 
   // ══════════════ CHALLENGE HANDLERS ══════════════
 
@@ -403,10 +459,6 @@ export default function Admin() {
   const visibleTabs = TABS.filter(t =>
     (t.id !== 'users' && t.id !== 'database' && t.id !== 'teams' && t.id !== 'schools' && t.id !== 'courses') || isSuperAdmin
   );
-
-  // ══════════════════════════════════════════
-  //  RENDER
-  // ══════════════════════════════════════════
 
   return (
     <div className="min-h-screen bg-nkt-bg bg-grid pt-20 pb-12">
@@ -878,82 +930,152 @@ export default function Admin() {
               </div>
             )}
 
-            <div className="bg-nkt-card border border-nkt-border rounded-lg overflow-hidden">
-              <div className="border-b border-nkt-border px-5 py-3 grid grid-cols-12 gap-2 bg-nkt-bg/30">
-                <span className="col-span-3 text-[10px] font-mono text-nkt-muted tracking-wider">ÉCOLE</span>
-                <span className="col-span-2 text-[10px] font-mono text-nkt-muted tracking-wider">CONTACT</span>
-                <span className="col-span-2 text-[10px] font-mono text-nkt-muted tracking-wider">PLAN</span>
-                <span className="col-span-2 text-[10px] font-mono text-nkt-muted tracking-wider">CODE ACCÈS</span>
-                <span className="col-span-1 text-[10px] font-mono text-nkt-muted tracking-wider">MEMBRES</span>
-                <span className="col-span-1 text-[10px] font-mono text-nkt-muted tracking-wider">STATUS</span>
-                <span className="col-span-1 text-[10px] font-mono text-nkt-muted tracking-wider text-right">ACTIONS</span>
-              </div>
+            {/* ── Liste écoles + membres ── */}
+            <div className="space-y-3">
               {schools.length === 0 ? (
-                <div className="text-center py-16">
+                <div className="text-center py-16 bg-nkt-card border border-nkt-border rounded-lg">
                   <GraduationCap size={40} className="text-nkt-muted/20 mx-auto mb-3" />
                   <p className="text-nkt-muted font-mono text-sm">Aucune école</p>
-                  <p className="text-nkt-muted/50 font-mono text-xs mt-1">Crée une école pour commencer</p>
                 </div>
               ) : schools.map(s => (
-                <div key={s.id} className={`px-5 py-4 grid grid-cols-12 gap-2 items-center border-b border-nkt-border/40 transition-all ${
-                  editingSchool?.id === s.id ? 'border-l-4 bg-purple-500/5' : 'hover:bg-white/[0.02]'
-                }`} style={editingSchool?.id === s.id ? { borderLeftColor: '#a855f7' } : {}}>
-                  <div className="col-span-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
-                        style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.3)', color: '#a855f7' }}>
-                        {s.name?.[0]?.toUpperCase() || '?'}
-                      </div>
-                      <div>
-                        <p className="font-mono text-sm text-nkt-text font-semibold">{s.name}</p>
-                        <p className="text-[10px] font-mono text-nkt-muted">{s.city || s.country}</p>
+                <div key={s.id} className="bg-nkt-card border border-nkt-border rounded-xl overflow-hidden">
+
+                  {/* ── Ligne école ── */}
+                  <div className={`px-5 py-4 grid grid-cols-12 gap-2 items-center transition-all ${
+                    editingSchool?.id === s.id ? 'border-l-4 bg-purple-500/5' : 'hover:bg-white/[0.02]'
+                  }`} style={editingSchool?.id === s.id ? { borderLeftColor: '#a855f7' } : {}}>
+                    <div className="col-span-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0"
+                          style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.3)', color: '#a855f7' }}>
+                          {s.name?.[0]?.toUpperCase() || '?'}
+                        </div>
+                        <div>
+                          <p className="font-mono text-sm text-nkt-text font-semibold">{s.name}</p>
+                          <p className="text-[10px] font-mono text-nkt-muted">{s.city || s.country}</p>
+                        </div>
                       </div>
                     </div>
+                    <div className="col-span-2">
+                      <p className="text-[10px] font-mono text-nkt-muted truncate">{s.email}</p>
+                      {s.phone && <p className="text-[10px] font-mono text-nkt-muted/60">{s.phone}</p>}
+                    </div>
+                    <div className="col-span-2">
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded border font-bold capitalize ${PLAN_COLORS[s.plan]}`}>
+                        {s.plan}
+                      </span>
+                      {s.expires_at && (
+                        <p className="text-[9px] font-mono text-nkt-muted mt-1">
+                          exp: {new Date(s.expires_at).toLocaleDateString('fr-FR')}
+                        </p>
+                      )}
+                    </div>
+                    <div className="col-span-2 flex items-center gap-1">
+                      <span className="font-mono text-xs text-nkt-cyan tracking-widest font-bold">{s.access_code}</span>
+                      <button onClick={() => copyToClipboard(s.access_code)} className="text-nkt-muted hover:text-nkt-cyan transition-colors p-1">
+                        <Copy size={11} />
+                      </button>
+                      <button onClick={() => handleRegenerateCode(s.id)} className="text-nkt-muted hover:text-yellow-400 transition-colors p-1" title="Régénérer">
+                        <RefreshCw size={11} />
+                      </button>
+                    </div>
+                    <div className="col-span-1">
+                      <button onClick={() => toggleSchoolMembers(s.id)}
+                        className="flex items-center gap-1 text-[11px] font-mono font-bold hover:text-nkt-cyan transition-colors"
+                        style={{ color: expandedSchool === s.id ? '#00d4ff' : '#8899aa' }}>
+                        <Users size={12} />
+                        <span>{s.member_count || 0}</span>
+                        {expandedSchool === s.id ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                      </button>
+                    </div>
+                    <div className="col-span-1">
+                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                        s.is_active ? 'text-nkt-green border-nkt-green/30 bg-nkt-green/10' : 'text-nkt-red border-nkt-red/30 bg-nkt-red/10'
+                      }`}>{s.is_active ? 'ON' : 'OFF'}</span>
+                    </div>
+                    <div className="col-span-1 flex items-center justify-end gap-1">
+                      <button onClick={() => openEditSchool(s)} className={`p-1.5 rounded border transition-all ${
+                        editingSchool?.id === s.id ? 'border-purple-400 bg-purple-400/20 text-purple-400'
+                          : 'border-nkt-border text-nkt-muted hover:border-purple-400 hover:text-purple-400 hover:bg-purple-400/10'
+                      }`}><Edit2 size={13} /></button>
+                      <button onClick={() => handleDeleteSchool(s.id)}
+                        className="p-1.5 rounded border border-transparent text-nkt-muted hover:border-nkt-red/30 hover:text-nkt-red hover:bg-nkt-red/10 transition-all">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   </div>
-                  <div className="col-span-2">
-                    <p className="text-[10px] font-mono text-nkt-muted truncate">{s.email}</p>
-                    {s.phone && <p className="text-[10px] font-mono text-nkt-muted/60">{s.phone}</p>}
-                  </div>
-                  <div className="col-span-2">
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded border font-bold capitalize ${PLAN_COLORS[s.plan]}`}>
-                      {s.plan}
-                    </span>
-                    {s.expires_at && (
-                      <p className="text-[9px] font-mono text-nkt-muted mt-1">
-                        exp: {new Date(s.expires_at).toLocaleDateString('fr-FR')}
-                      </p>
-                    )}
-                  </div>
-                  <div className="col-span-2 flex items-center gap-1">
-                    <span className="font-mono text-xs text-nkt-cyan tracking-widest font-bold">{s.access_code}</span>
-                    <button onClick={() => copyToClipboard(s.access_code)}
-                      className="text-nkt-muted hover:text-nkt-cyan transition-colors p-1">
-                      <Copy size={11} />
-                    </button>
-                    <button onClick={() => handleRegenerateCode(s.id)}
-                      className="text-nkt-muted hover:text-yellow-400 transition-colors p-1" title="Régénérer le code">
-                      <RefreshCw size={11} />
-                    </button>
-                  </div>
-                  <div className="col-span-1">
-                    <span className="font-mono text-sm text-nkt-text">{s.member_count || 0}</span>
-                    <span className="text-[10px] font-mono text-nkt-muted">/{s.max_students === 99999 ? '∞' : s.max_students}</span>
-                  </div>
-                  <div className="col-span-1">
-                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
-                      s.is_active ? 'text-nkt-green border-nkt-green/30 bg-nkt-green/10' : 'text-nkt-red border-nkt-red/30 bg-nkt-red/10'
-                    }`}>{s.is_active ? 'ON' : 'OFF'}</span>
-                  </div>
-                  <div className="col-span-1 flex items-center justify-end gap-1">
-                    <button onClick={() => openEditSchool(s)} className={`p-1.5 rounded border transition-all ${
-                      editingSchool?.id === s.id ? 'border-purple-400 bg-purple-400/20 text-purple-400'
-                        : 'border-nkt-border text-nkt-muted hover:border-purple-400 hover:text-purple-400 hover:bg-purple-400/10'
-                    }`}><Edit2 size={13} /></button>
-                    <button onClick={() => handleDeleteSchool(s.id)}
-                      className="p-1.5 rounded border border-transparent text-nkt-muted hover:border-nkt-red/30 hover:text-nkt-red hover:bg-nkt-red/10 transition-all">
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
+
+                  {/* ── Panel membres (expandable) ── */}
+                  {expandedSchool === s.id && (
+                    <div className="border-t border-nkt-border bg-nkt-bg/30">
+                      <div className="px-5 py-2 flex items-center gap-2 border-b border-nkt-border/40">
+                        <UserCheck size={12} style={{ color: '#a855f7' }} />
+                        <span className="text-[10px] font-mono font-bold tracking-widest" style={{ color: '#a855f7' }}>MEMBRES DE L'ÉCOLE</span>
+                      </div>
+
+                      {loadingMembers ? (
+                        <div className="flex items-center justify-center py-8">
+                          <div className="w-5 h-5 border-2 border-nkt-green border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      ) : !schoolMembers[s.id] || schoolMembers[s.id].length === 0 ? (
+                        <div className="text-center py-8">
+                          <p className="font-mono text-xs text-nkt-muted">Aucun membre pour l'instant</p>
+                          <p className="font-mono text-[10px] text-nkt-muted/50 mt-1">Code : <span className="text-nkt-cyan font-bold">{s.access_code}</span></p>
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-nkt-border/20">
+                          {/* Header */}
+                          <div className="px-5 py-2 grid grid-cols-12 gap-2 bg-nkt-bg/20">
+                            <span className="col-span-4 text-[10px] font-mono text-nkt-muted tracking-wider">UTILISATEUR</span>
+                            <span className="col-span-3 text-[10px] font-mono text-nkt-muted tracking-wider">EMAIL</span>
+                            <span className="col-span-2 text-[10px] font-mono text-nkt-muted tracking-wider">REJOINT LE</span>
+                            <span className="col-span-2 text-[10px] font-mono text-nkt-muted tracking-wider">RÔLE</span>
+                            <span className="col-span-1 text-[10px] font-mono text-nkt-muted tracking-wider text-right">ACTION</span>
+                          </div>
+                          {schoolMembers[s.id].map(m => (
+                            <div key={m.id} className="px-5 py-3 grid grid-cols-12 gap-2 items-center hover:bg-white/[0.02] transition-all">
+                              <div className="col-span-4 flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
+                                  style={{ background: m.school_role === 'teacher' ? 'rgba(0,212,255,0.1)' : 'rgba(255,255,255,0.03)', border: `1px solid ${m.school_role === 'teacher' ? 'rgba(0,212,255,0.3)' : '#1a2535'}`, color: m.school_role === 'teacher' ? '#00d4ff' : '#8899aa' }}>
+                                  {m.username?.[0]?.toUpperCase()}
+                                </div>
+                                <span className="font-mono text-sm text-nkt-text font-semibold">{m.username}</span>
+                              </div>
+                              <div className="col-span-3">
+                                <span className="font-mono text-xs text-nkt-muted truncate block">{m.email}</span>
+                              </div>
+                              <div className="col-span-2">
+                                <span className="font-mono text-[10px] text-nkt-muted">
+                                  {m.joined_at ? new Date(m.joined_at).toLocaleDateString('fr-FR') : '—'}
+                                </span>
+                              </div>
+                              <div className="col-span-2">
+                                {/* Dropdown rôle */}
+                                <select
+                                  value={m.school_role}
+                                  onChange={e => handleChangeMemberRole(s.id, m.user_id, e.target.value)}
+                                  className={`text-[10px] font-mono px-2 py-1.5 rounded border bg-transparent cursor-pointer transition-all ${
+                                    m.school_role === 'teacher'
+                                      ? 'text-nkt-cyan border-nkt-cyan/40 bg-nkt-cyan/10'
+                                      : 'text-nkt-muted border-nkt-border'
+                                  }`}>
+                                  <option value="student" className="bg-nkt-bg text-nkt-text">STUDENT</option>
+                                  <option value="teacher" className="bg-nkt-bg text-nkt-text">TEACHER</option>
+                                </select>
+                              </div>
+                              <div className="col-span-1 flex justify-end">
+                                <button onClick={() => handleRemoveMember(s.id, m.user_id)}
+                                  className="p-1.5 rounded border border-transparent text-nkt-muted hover:border-nkt-red/30 hover:text-nkt-red hover:bg-nkt-red/10 transition-all">
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                 </div>
               ))}
             </div>

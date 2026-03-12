@@ -170,13 +170,43 @@ router.get('/my', authMiddleware, async (req, res) => {
 router.get('/:id/members', authMiddleware, isTeacherOrAdmin, async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT u.id, u.username, u.email, u.score, sm.role, sm.joined_at
+      SELECT u.id, u.username, u.email, u.score,
+             sm.user_id, sm.role as school_role, sm.joined_at
       FROM school_members sm
       JOIN users u ON u.id = sm.user_id
       WHERE sm.school_id = $1
       ORDER BY sm.joined_at DESC
     `, [req.params.id]);
     res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT changer le rôle d'un membre
+router.put('/:id/members/:userId/role', authMiddleware, isSuperAdmin, async (req, res) => {
+  const { role } = req.body;
+  if (!['student', 'teacher'].includes(role))
+    return res.status(400).json({ error: 'Rôle invalide (student ou teacher)' });
+  try {
+    await pool.query(
+      'UPDATE school_members SET role=$1 WHERE school_id=$2 AND user_id=$3',
+      [role, req.params.id, req.params.userId]
+    );
+    res.json({ message: 'Rôle mis à jour' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE retirer un membre
+router.delete('/:id/members/:userId', authMiddleware, isSuperAdmin, async (req, res) => {
+  try {
+    await pool.query(
+      'DELETE FROM school_members WHERE school_id=$1 AND user_id=$2',
+      [req.params.id, req.params.userId]
+    );
+    res.json({ message: 'Membre retiré' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
