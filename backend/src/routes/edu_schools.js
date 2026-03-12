@@ -140,8 +140,10 @@ router.post('/join', authMiddleware, async (req, res) => {
       [s.id, req.user.id, 'student']
     );
 
-    // Update role utilisateur
-    await pool.query('UPDATE users SET role=$1 WHERE id=$2', ['student', req.user.id]);
+    // Update role uniquement si pas superadmin/manager
+    if (!['superadmin', 'manager'].includes(req.user.role)) {
+      await pool.query('UPDATE users SET role=$1 WHERE id=$2', ['student', req.user.id]);
+    }
 
     res.json({ message: `Bienvenue dans ${s.name} !`, school: { id: s.id, name: s.name } });
   } catch (err) {
