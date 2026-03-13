@@ -49,20 +49,11 @@ export default function Navbar() {
     { to: '/events',     label: 'EVENTS',     icon: Calendar         },
     { to: '/scoreboard', label: 'SCOREBOARD', icon: Trophy           },
     { to: '/pricing',    label: 'PRICING',    icon: Crown            },
-    // Liens école — visibles selon rôle
+    { to: '/school',     label: 'SCHOOL',     icon: School, color: '#a855f7' },
     ...(isTeacher
-      ? [{ to: '/teacher',   label: 'TEACHER',   icon: GraduationCap, color: '#a855f7' }]
+      ? [{ to: '/teacher', label: 'TEACHER', icon: GraduationCap, color: '#a855f7' }]
       : []
     ),
-    ...(isSchoolMember && !isTeacher
-      ? [{ to: '/my-school', label: 'MON ÉCOLE', icon: School, color: '#a855f7' }]
-      : []
-    ),
-    ...(isTeacher
-      ? [{ to: '/my-school', label: 'MON ÉCOLE', icon: School, color: '#a855f7' }]
-      : []
-    ),
-    // Admin
     ...(user?.role === 'superadmin' || user?.role === 'manager'
       ? [{ to: '/admin', label: 'ADMIN', icon: Cpu }]
       : []
@@ -195,7 +186,7 @@ export default function Navbar() {
 
                     {/* MON ÉCOLE dans le dropdown aussi */}
                     {isSchoolMember && (
-                      <button onClick={() => { navigate('/my-school'); setDropdownOpen(false); }}
+                      <button onClick={() => { navigate('/school'); setDropdownOpen(false); }}
                         className="w-full flex items-center justify-between px-4 py-3 text-sm font-mono text-nkt-text hover:bg-white/[0.04] transition-all group">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-lg border border-nkt-border bg-nkt-bg flex items-center justify-center group-hover:border-purple-500/30 group-hover:bg-purple-500/5 transition-all">
