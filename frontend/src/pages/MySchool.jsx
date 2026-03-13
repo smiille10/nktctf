@@ -85,15 +85,19 @@ export default function MySchool() {
 
   const loadAll = useCallback(async () => {
     try {
-      const [schoolRes, feedRes] = await Promise.all([
-        api.get('/schools/my/full'),
-        api.get('/schools/my/feed'),
-      ]);
+      const schoolRes = await api.get('/schools/my/full');
       setSchoolData(schoolRes.data);
-      setFeed(feedRes.data || []);
+      try {
+        const feedRes = await api.get('/schools/my/feed');
+        setFeed(feedRes.data || []);
+      } catch {}
     } catch (err) {
-      if (err.response?.status === 404) navigate('/join-school');
-      else setMsg('❌ ' + (err.response?.data?.error || 'Erreur chargement'));
+      console.error('School error:', err);
+      if (err.response?.status === 404 || err.response?.status === 403) {
+        navigate('/join-school');
+      } else {
+        setMsg('❌ ' + (err.response?.data?.error || 'Erreur chargement école'));
+      }
     } finally {
       setLoading(false);
     }

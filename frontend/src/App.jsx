@@ -73,7 +73,7 @@ function AppRoutes() {
 
         {/* ── EDU ── */}
         <Route path="/join-school"       element={<ProtectedRoute><JoinSchool /></ProtectedRoute>} />
-        <Route path="/my-school"         element={<ProtectedRoute><MySchool /></ProtectedRoute>} />
+        <Route path="/school"         element={<ProtectedRoute><MySchool /></ProtectedRoute>} />
         <Route path="/learn"             element={<ProtectedRoute><Learn /></ProtectedRoute>} />
         <Route path="/learn/:id"         element={<ProtectedRoute><CourseDetail /></ProtectedRoute>} />
         <Route path="/exam/:id/live"     element={<ProtectedRoute><ExamLive /></ProtectedRoute>} />
