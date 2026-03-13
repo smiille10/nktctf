@@ -112,12 +112,21 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Mot de passe incorrect' });
     }
 
+    // Récupérer le rôle école si membre
+    const schoolMember = await pool.query(
+      'SELECT school_id, role as school_role FROM school_members WHERE user_id=$1 LIMIT 1',
+      [user.id]
+    );
+    const sm = schoolMember.rows[0] || {};
+
     const token = jwt.sign(
       {
         id: user.id,
         username: user.username,
         role: user.role,
-        is_admin: user.role === 'superadmin' || user.role === 'manager'
+        is_admin: user.role === 'superadmin' || user.role === 'manager',
+        school_id: sm.school_id || null,
+        school_role: sm.school_role || null,
       },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
@@ -131,7 +140,9 @@ router.post('/login', async (req, res) => {
         email: user.email,
         score: user.score,
         role: user.role,
-        is_admin: user.role === 'superadmin' || user.role === 'manager'
+        is_admin: user.role === 'superadmin' || user.role === 'manager',
+        school_id: sm.school_id || null,
+        school_role: sm.school_role || null,
       }
     });
 

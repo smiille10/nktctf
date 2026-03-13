@@ -5,7 +5,7 @@ import {
   Terminal, Trophy, Shield, LogOut,
   Menu, X, Cpu, LayoutDashboard,
   Calendar, Crown, Zap, Settings,
-  ChevronRight, Users
+  ChevronRight, Users, School, GraduationCap
 } from 'lucide-react';
 
 const PLAN_COLORS = {
@@ -30,18 +30,17 @@ export default function Navbar() {
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target))
         setDropdownOpen(false);
-      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+  const handleLogout = () => { logout(); navigate('/login'); };
+
+  const isTeacher   = user?.school_role === 'teacher';
+  const isSchoolMember = user?.school_id || user?.school_role;
 
   const links = [
     { to: '/dashboard',  label: 'DASHBOARD',  icon: LayoutDashboard },
@@ -50,15 +49,29 @@ export default function Navbar() {
     { to: '/events',     label: 'EVENTS',     icon: Calendar         },
     { to: '/scoreboard', label: 'SCOREBOARD', icon: Trophy           },
     { to: '/pricing',    label: 'PRICING',    icon: Crown            },
+    // Liens école — visibles selon rôle
+    ...(isTeacher
+      ? [{ to: '/teacher',   label: 'TEACHER',   icon: GraduationCap, color: '#a855f7' }]
+      : []
+    ),
+    ...(isSchoolMember && !isTeacher
+      ? [{ to: '/my-school', label: 'MON ÉCOLE', icon: School, color: '#a855f7' }]
+      : []
+    ),
+    ...(isTeacher
+      ? [{ to: '/my-school', label: 'MON ÉCOLE', icon: School, color: '#a855f7' }]
+      : []
+    ),
+    // Admin
     ...(user?.role === 'superadmin' || user?.role === 'manager'
       ? [{ to: '/admin', label: 'ADMIN', icon: Cpu }]
       : []
     ),
   ];
 
-  const isActive    = (path) => location.pathname === path;
-  const planColor   = PLAN_COLORS[user?.plan]  || PLAN_COLORS.free;
-  const planLabel   = PLAN_LABELS[user?.plan]  || PLAN_LABELS.free;
+  const isActive  = (path) => location.pathname.startsWith(path);
+  const planColor = PLAN_COLORS[user?.plan]  || PLAN_COLORS.free;
+  const planLabel = PLAN_LABELS[user?.plan]  || PLAN_LABELS.free;
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-nkt-border bg-nkt-bg/90 backdrop-blur-md">
@@ -81,13 +94,22 @@ export default function Navbar() {
 
         {/* ── Links desktop ── */}
         <div className="hidden md:flex items-center gap-1">
-          {links.map(({ to, label, icon: Icon }) => (
+          {links.map(({ to, label, icon: Icon, color }) => (
             <Link key={to} to={to}
               className={`flex items-center gap-2 px-3 py-2 rounded text-[11px] font-mono font-semibold tracking-widest transition-all duration-300 ${
                 isActive(to)
-                  ? 'text-nkt-green bg-nkt-green/10 border border-nkt-green/30'
-                  : 'text-nkt-muted hover:text-nkt-green hover:bg-nkt-green/5 border border-transparent'
-              }`}>
+                  ? color
+                    ? 'border'
+                    : 'text-nkt-green bg-nkt-green/10 border border-nkt-green/30'
+                  : color
+                    ? 'border border-transparent hover:border-purple-500/30 hover:bg-purple-500/5'
+                    : 'text-nkt-muted hover:text-nkt-green hover:bg-nkt-green/5 border border-transparent'
+              }`}
+              style={color ? {
+                color: isActive(to) ? color : '#9ca3af',
+                borderColor: isActive(to) ? `${color}50` : 'transparent',
+                backgroundColor: isActive(to) ? `${color}15` : undefined,
+              } : {}}>
               <Icon size={13} />
               {label}
             </Link>
@@ -98,8 +120,6 @@ export default function Navbar() {
         <div className="hidden md:flex items-center" ref={dropdownRef}>
           {user && (
             <div className="relative">
-
-              {/* Avatar bouton */}
               <button
                 onClick={() => setDropdownOpen(v => !v)}
                 className="flex items-center gap-3 hover:opacity-90 transition-opacity">
@@ -130,7 +150,6 @@ export default function Navbar() {
                 </div>
               </button>
 
-              {/* ── DROPDOWN ── */}
               {dropdownOpen && (
                 <div className="absolute right-0 top-full mt-3 w-64 bg-nkt-card border border-nkt-border rounded-xl overflow-hidden shadow-2xl shadow-black/60 z-50">
                   <div className="absolute top-0 left-0 right-0 h-[2px]"
@@ -157,12 +176,11 @@ export default function Navbar() {
                       </div>
                     </div>
 
-                    {/* Mini stats */}
                     <div className="mt-3 grid grid-cols-3 gap-2">
                       {[
-                        { label: 'PTS',  value: user.score || 0              },
+                        { label: 'PTS',  value: user.score || 0 },
                         { label: 'PLAN', value: user.plan?.toUpperCase() || 'FREE' },
-                        { label: 'ROLE', value: user.role === 'superadmin' ? 'ADMIN' : user.role === 'manager' ? 'MGR' : 'USER' },
+                        { label: 'ROLE', value: user.role === 'superadmin' ? 'ADMIN' : user.role === 'manager' ? 'MGR' : isTeacher ? 'PROF' : 'USER' },
                       ].map(({ label, value }) => (
                         <div key={label} className="bg-nkt-bg rounded-lg py-2 text-center border border-nkt-border">
                           <p className="font-display font-bold text-sm" style={{ color: planColor }}>{value}</p>
@@ -175,9 +193,34 @@ export default function Navbar() {
                   {/* Items */}
                   <div className="py-2">
 
-                    {/* Account */}
-                    <button
-                      onClick={() => { navigate('/account'); setDropdownOpen(false); }}
+                    {/* MON ÉCOLE dans le dropdown aussi */}
+                    {isSchoolMember && (
+                      <button onClick={() => { navigate('/my-school'); setDropdownOpen(false); }}
+                        className="w-full flex items-center justify-between px-4 py-3 text-sm font-mono text-nkt-text hover:bg-white/[0.04] transition-all group">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg border border-nkt-border bg-nkt-bg flex items-center justify-center group-hover:border-purple-500/30 group-hover:bg-purple-500/5 transition-all">
+                            <School size={14} className="text-nkt-muted group-hover:text-purple-400 transition-colors" />
+                          </div>
+                          <span className="group-hover:text-purple-400 transition-colors">Mon École</span>
+                        </div>
+                        <ChevronRight size={14} className="text-nkt-muted/40" />
+                      </button>
+                    )}
+
+                    {isTeacher && (
+                      <button onClick={() => { navigate('/teacher'); setDropdownOpen(false); }}
+                        className="w-full flex items-center justify-between px-4 py-3 text-sm font-mono text-nkt-text hover:bg-white/[0.04] transition-all group">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg border border-nkt-border bg-nkt-bg flex items-center justify-center group-hover:border-purple-500/30 group-hover:bg-purple-500/5 transition-all">
+                            <GraduationCap size={14} className="text-nkt-muted group-hover:text-purple-400 transition-colors" />
+                          </div>
+                          <span className="group-hover:text-purple-400 transition-colors">Dashboard Teacher</span>
+                        </div>
+                        <ChevronRight size={14} className="text-nkt-muted/40" />
+                      </button>
+                    )}
+
+                    <button onClick={() => { navigate('/account'); setDropdownOpen(false); }}
                       className="w-full flex items-center justify-between px-4 py-3 text-sm font-mono text-nkt-text hover:bg-white/[0.04] hover:text-nkt-green transition-all group">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg border border-nkt-border bg-nkt-bg flex items-center justify-center group-hover:border-nkt-green/30 group-hover:bg-nkt-green/5 transition-all">
@@ -188,10 +231,8 @@ export default function Navbar() {
                       <ChevronRight size={14} className="text-nkt-muted/40 group-hover:text-nkt-green/60" />
                     </button>
 
-                    {/* Upgrade si free */}
                     {user.plan === 'free' && (
-                      <button
-                        onClick={() => { navigate('/pricing'); setDropdownOpen(false); }}
+                      <button onClick={() => { navigate('/pricing'); setDropdownOpen(false); }}
                         className="w-full flex items-center justify-between px-4 py-3 text-sm font-mono transition-all">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-lg border border-yellow-400/30 bg-yellow-400/5 flex items-center justify-center">
@@ -205,9 +246,7 @@ export default function Navbar() {
 
                     <div className="mx-4 my-1 border-t border-nkt-border" />
 
-                    {/* Logout */}
-                    <button
-                      onClick={handleLogout}
+                    <button onClick={handleLogout}
                       className="w-full flex items-center gap-3 px-4 py-3 text-sm font-mono text-nkt-muted hover:text-nkt-red hover:bg-nkt-red/5 transition-all group">
                       <div className="w-8 h-8 rounded-lg border border-transparent group-hover:border-nkt-red/30 group-hover:bg-nkt-red/10 flex items-center justify-center transition-all">
                         <LogOut size={14} />
@@ -230,12 +269,18 @@ export default function Navbar() {
       {/* ── Menu mobile ── */}
       {menuOpen && (
         <div className="md:hidden border-t border-nkt-border bg-nkt-card px-4 py-4 space-y-1">
-          {links.map(({ to, label, icon: Icon }) => (
+          {links.map(({ to, label, icon: Icon, color }) => (
             <Link key={to} to={to}
               onClick={() => setMenuOpen(false)}
               className={`flex items-center gap-3 py-2.5 px-3 rounded text-sm font-mono transition-colors ${
-                isActive(to) ? 'text-nkt-green bg-nkt-green/10' : 'text-nkt-muted hover:text-nkt-green'
-              }`}>
+                isActive(to)
+                  ? color ? '' : 'text-nkt-green bg-nkt-green/10'
+                  : color ? '' : 'text-nkt-muted hover:text-nkt-green'
+              }`}
+              style={color ? {
+                color: isActive(to) ? color : '#9ca3af',
+                backgroundColor: isActive(to) ? `${color}15` : undefined,
+              } : {}}>
               <Icon size={15} /> {label}
             </Link>
           ))}

@@ -15,7 +15,7 @@ const isSuperAdmin = (req, res, next) => {
 router.get('/my-school', authMiddleware, async (req, res) => {
   try {
     const school = await pool.query(
-      "SELECT school_id FROM school_members WHERE user_id=$1 AND school_role='teacher'",
+      "SELECT school_id FROM school_members WHERE user_id=$1 AND role='teacher'",
       [req.user.id]
     );
     if (!school.rows[0]) return res.status(403).json({ error: 'Vous n\'êtes pas enseignant' });

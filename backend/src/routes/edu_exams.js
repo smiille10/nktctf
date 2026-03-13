@@ -72,7 +72,7 @@ router.get('/my-school', authMiddleware, async (req, res) => {
   try {
     // Trouver l'école du prof
     const school = await pool.query(
-      "SELECT school_id FROM school_members WHERE user_id=$1 AND school_role='teacher'",
+      "SELECT school_id FROM school_members WHERE user_id=$1 AND role='teacher'",
       [req.user.id]
     );
     if (!school.rows[0]) return res.status(403).json({ error: 'Vous n\'êtes pas enseignant dans une école' });
@@ -405,7 +405,7 @@ router.get('/:id/sessions', authMiddleware, async (req, res) => {
     if (!exam.rows[0]) return res.status(404).json({ error: 'Examen introuvable' });
 
     const isMember = await pool.query(
-      "SELECT 1 FROM school_members WHERE school_id=$1 AND user_id=$2 AND school_role='teacher'",
+      "SELECT 1 FROM school_members WHERE school_id=$1 AND user_id=$2 AND role='teacher'",
       [exam.rows[0].school_id, req.user.id]
     );
     const isAdmin = req.user.role === 'superadmin';
