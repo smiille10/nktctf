@@ -212,4 +212,160 @@ router.delete('/:id/members/:userId', authMiddleware, isSuperAdmin, async (req, 
   }
 });
 
+
+// ─── ROUTES /my/* — données de l'école de l'utilisateur connecté ───
+
+// GET mon école complète (infos + membres + stats)
+router.get('/my/full', authMiddleware, async (req, res) => {
+  try {
+    const sm = await pool.query(
+      'SELECT school_id, role FROM school_members WHERE user_id=$1 LIMIT 1',
+      [req.user.id]
+    );
+    if (!sm.rows[0]) return res.status(404).json({ error: 'Tu n\'es pas dans une école' });
+    const { school_id, role } = sm.rows[0];
+
+    const [school, members, examCount, assignCount, courseCount] = await Promise.all([
+      pool.query('SELECT * FROM schools WHERE id=$1', [school_id]),
+      pool.query(`
+        SELECT u.id, u.username, u.email, u.score,
+               sm2.role as school_role, sm2.joined_at
+        FROM school_members sm2
+        JOIN users u ON u.id = sm2.user_id
+        WHERE sm2.school_id = $1
+        ORDER BY sm2.role ASC, u.score DESC
+      `, [school_id]),
+      pool.query('SELECT COUNT(*)::int as c FROM exams WHERE school_id=$1 AND status=$2', [school_id, 'active']),
+      pool.query('SELECT COUNT(*)::int as c FROM assignments WHERE school_id=$1', [school_id]),
+      pool.query('SELECT COUNT(*)::int as c FROM courses WHERE school_id=$1 AND is_published=true', [school_id]),
+    ]);
+
+    res.json({
+      school: school.rows[0],
+      my_role: role,
+      members: members.rows,
+      stats: {
+        students: members.rows.filter(m => m.school_role === 'student').length,
+        teachers: members.rows.filter(m => m.school_role === 'teacher').length,
+        exams: examCount.rows[0].c,
+        assignments: assignCount.rows[0].c,
+        courses: courseCount.rows[0].c,
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET classement de mon école
+router.get('/my/leaderboard', authMiddleware, async (req, res) => {
+  try {
+    const sm = await pool.query(
+      'SELECT school_id FROM school_members WHERE user_id=$1 LIMIT 1',
+      [req.user.id]
+    );
+    if (!sm.rows[0]) return res.status(404).json({ error: 'Non membre' });
+    const school_id = sm.rows[0].school_id;
+
+    const result = await pool.query(`
+      SELECT u.id, u.username, u.score,
+             COUNT(DISTINCT es.exam_id) FILTER (WHERE es.status='finished')::int as exams_done,
+             COALESCE(SUM(es.score) FILTER (WHERE es.status='finished'), 0)::int as exam_score,
+             COUNT(DISTINCT cert.id)::int as certificates,
+             sm2.joined_at
+      FROM school_members sm2
+      JOIN users u ON u.id = sm2.user_id
+      LEFT JOIN exam_sessions es ON es.user_id = u.id
+      LEFT JOIN certificates cert ON cert.user_id = u.id
+      WHERE sm2.school_id = $1 AND sm2.role = 'student'
+      GROUP BY u.id, u.username, u.score, sm2.joined_at
+      ORDER BY exam_score DESC, u.score DESC
+    `, [school_id]);
+
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET feed activité de mon école
+router.get('/my/feed', authMiddleware, async (req, res) => {
+  try {
+    const sm = await pool.query(
+      'SELECT school_id FROM school_members WHERE user_id=$1 LIMIT 1',
+      [req.user.id]
+    );
+    if (!sm.rows[0]) return res.status(404).json({ error: 'Non membre' });
+    const school_id = sm.rows[0].school_id;
+
+    const [exams, assignments, courses, certs] = await Promise.all([
+      pool.query(`
+        SELECT 'exam' as type, id, title, created_at, status,
+               'Nouvel examen disponible' as subtitle
+        FROM exams WHERE school_id=$1 AND status='active'
+        ORDER BY created_at DESC LIMIT 5
+      `, [school_id]),
+      pool.query(`
+        SELECT 'assignment' as type, id, title, created_at,
+               'Devoir à rendre' as subtitle, due_date
+        FROM assignments WHERE school_id=$1
+        ORDER BY created_at DESC LIMIT 5
+      `, [school_id]),
+      pool.query(`
+        SELECT 'course' as type, id, title, created_at,
+               'Nouveau cours publié' as subtitle
+        FROM courses WHERE school_id=$1 AND is_published=true
+        ORDER BY created_at DESC LIMIT 5
+      `, [school_id]),
+      pool.query(`
+        SELECT 'certificate' as type, c.id, e.title, c.created_at,
+               'Certificat obtenu' as subtitle, u.username
+        FROM certificates c
+        JOIN exams e ON e.id = c.exam_id
+        JOIN users u ON u.id = c.user_id
+        JOIN school_members sm2 ON sm2.user_id = c.user_id AND sm2.school_id = $1
+        ORDER BY c.created_at DESC LIMIT 5
+      `, [school_id]),
+    ]);
+
+    const feed = [
+      ...exams.rows,
+      ...assignments.rows,
+      ...courses.rows,
+      ...certs.rows,
+    ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 20);
+
+    res.json(feed);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET certificats des étudiants (teacher/admin)
+router.get('/my/certificates', authMiddleware, async (req, res) => {
+  try {
+    const sm = await pool.query(
+      'SELECT school_id, role FROM school_members WHERE user_id=$1 LIMIT 1',
+      [req.user.id]
+    );
+    if (!sm.rows[0]) return res.status(404).json({ error: 'Non membre' });
+    if (sm.rows[0].role !== 'teacher' && req.user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Réservé aux enseignants' });
+    }
+
+    const result = await pool.query(`
+      SELECT c.*, u.username, u.email, e.title as exam_title
+      FROM certificates c
+      JOIN users u ON u.id = c.user_id
+      JOIN exams e ON e.id = c.exam_id
+      JOIN school_members sm2 ON sm2.user_id = c.user_id AND sm2.school_id = $1
+      ORDER BY c.created_at DESC
+    `, [sm.rows[0].school_id]);
+
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

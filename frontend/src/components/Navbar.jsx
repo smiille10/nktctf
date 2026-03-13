@@ -40,7 +40,6 @@ export default function Navbar() {
   const handleLogout = () => { logout(); navigate('/login'); };
 
   const isTeacher   = user?.school_role === 'teacher';
-  const isSchoolMember = user?.school_id || user?.school_role;
 
   const links = [
     { to: '/dashboard',  label: 'DASHBOARD',  icon: LayoutDashboard },
@@ -185,18 +184,6 @@ export default function Navbar() {
                   <div className="py-2">
 
                     {/* MON ÉCOLE dans le dropdown aussi */}
-                    {isSchoolMember && (
-                      <button onClick={() => { navigate('/school'); setDropdownOpen(false); }}
-                        className="w-full flex items-center justify-between px-4 py-3 text-sm font-mono text-nkt-text hover:bg-white/[0.04] transition-all group">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg border border-nkt-border bg-nkt-bg flex items-center justify-center group-hover:border-purple-500/30 group-hover:bg-purple-500/5 transition-all">
-                            <School size={14} className="text-nkt-muted group-hover:text-purple-400 transition-colors" />
-                          </div>
-                          <span className="group-hover:text-purple-400 transition-colors">Mon École</span>
-                        </div>
-                        <ChevronRight size={14} className="text-nkt-muted/40" />
-                      </button>
-                    )}
 
                     {isTeacher && (
                       <button onClick={() => { navigate('/teacher'); setDropdownOpen(false); }}
