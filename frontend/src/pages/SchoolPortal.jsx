@@ -108,10 +108,10 @@ export default function SchoolPortal() {
           </div>
           <h1 className="font-display text-2xl font-bold text-nkt-text mb-1">{school.name}</h1>
           {school.city && <p className="font-mono text-xs text-nkt-muted">{school.city}, {school.country}</p>}
-          {school.allowed_domain && (
+          {school.email && (
             <div className="inline-flex items-center gap-1.5 mt-3 bg-purple-500/10 border border-purple-500/20 rounded-full px-4 py-1.5">
               <Mail size={11} className="text-purple-400" />
-              <span className="font-mono text-[11px] text-purple-300 font-bold">@{school.allowed_domain} uniquement</span>
+              <span className="font-mono text-[11px] text-purple-300 font-bold">{school.email}</span>
             </div>
           )}
         </div>
