@@ -198,8 +198,8 @@ export default function SchoolPortal() {
                   <label className="block text-[10px] font-mono text-nkt-muted tracking-widest mb-2">JE SUIS</label>
                   <div className="grid grid-cols-2 gap-3">
                     {[
-                      { id: 'student', label: 'Étudiant',   icon: User,          desc: 'Cours & examens' },
-                      { id: 'teacher', label: 'Enseignant', icon: GraduationCap, desc: 'Gère la classe'   },
+                      { id: 'student', label: 'Étudiant',   icon: User          },
+                      { id: 'teacher', label: 'Enseignant', icon: GraduationCap },
                     ].map(r => (
                       <button key={r.id} type="button" onClick={() => setRole(r.id)}
                         className={`p-3 rounded-lg border text-left transition-all ${
@@ -207,7 +207,6 @@ export default function SchoolPortal() {
                         }`}>
                         <r.icon size={16} className={`mb-1 ${role === r.id ? 'text-purple-400' : 'text-nkt-muted'}`} />
                         <p className={`font-mono text-xs font-bold ${role === r.id ? 'text-purple-300' : 'text-nkt-text'}`}>{r.label}</p>
-                        <p className="font-mono text-[10px] text-nkt-muted">{r.desc}</p>
                       </button>
                     ))}
                   </div>
