@@ -8,7 +8,7 @@ import {
   Upload, X, Users, Database, Shield,
   Activity, Target, Zap, Calendar, Edit2, Save,
   MessageSquare, Crown, GraduationCap, RefreshCw, Copy, BookOpen,
-  ChevronDown, ChevronRight, UserCheck, ClipboardList
+  ChevronDown, ChevronRight, UserCheck, ClipboardList, ExternalLink
 } from 'lucide-react';
 import AdminCourses      from '../components/AdminCourses';
 import AdminExams        from '../components/AdminExams';
@@ -69,7 +69,7 @@ const EMPTY_EVENT = {
 
 const EMPTY_SCHOOL = {
   name: '', email: '', phone: '', country: 'Mauritanie',
-  city: '', plan: 'starter', expires_at: '',
+  city: '', plan: 'starter', expires_at: '', allowed_domain: '',
 };
 
 export default function Admin() {
@@ -919,6 +919,16 @@ export default function Admin() {
                     <input type="date" className="nkt-input w-full px-4 py-2.5 rounded text-sm" value={schoolForm.expires_at}
                       onChange={e => setSchoolForm({ ...schoolForm, expires_at: e.target.value })} />
                   </div>
+                  <div>
+                    <label className="block text-[11px] font-mono text-nkt-muted mb-1 tracking-widest">DOMAINE EMAIL AUTORISÉ <span className="text-nkt-muted/50">(optionnel)</span></label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-nkt-muted text-sm">@</span>
+                      <input className="nkt-input w-full pl-7 pr-4 py-2.5 rounded text-sm" value={schoolForm.allowed_domain}
+                        onChange={e => setSchoolForm({ ...schoolForm, allowed_domain: e.target.value })}
+                        placeholder="groupeisi.com" />
+                    </div>
+                    <p className="text-[10px] font-mono text-nkt-muted/60 mt-1">Si renseigné, seuls les emails @groupeisi.com pourront rejoindre</p>
+                  </div>
                   <div className="md:col-span-2 flex gap-3 pt-2">
                     <button type="submit" disabled={loading}
                       className="px-8 py-3 rounded text-sm font-mono font-bold flex items-center gap-2"
@@ -962,7 +972,10 @@ export default function Admin() {
                     </div>
                     <div className="col-span-2">
                       <p className="text-[10px] font-mono text-nkt-muted truncate">{s.email}</p>
-                      {s.phone && <p className="text-[10px] font-mono text-nkt-muted/60">{s.phone}</p>}
+                      {s.allowed_domain
+                        ? <p className="text-[10px] font-mono text-purple-400 mt-0.5">@{s.allowed_domain}</p>
+                        : <p className="text-[10px] font-mono text-nkt-muted/40 mt-0.5">tout domaine</p>
+                      }
                     </div>
                     <div className="col-span-2">
                       <span className={`text-[10px] font-mono px-2 py-0.5 rounded border font-bold capitalize ${PLAN_COLORS[s.plan]}`}>
@@ -998,6 +1011,10 @@ export default function Admin() {
                       }`}>{s.is_active ? 'ON' : 'OFF'}</span>
                     </div>
                     <div className="col-span-1 flex items-center justify-end gap-1">
+                      <button onClick={() => window.open(`/school/${s.id}`, '_blank')}
+                        className="p-1.5 rounded border border-transparent text-nkt-muted hover:border-purple-400/30 hover:text-purple-400 hover:bg-purple-400/10 transition-all" title="Voir portail">
+                        <ExternalLink size={13} />
+                      </button>
                       <button onClick={() => openEditSchool(s)} className={`p-1.5 rounded border transition-all ${
                         editingSchool?.id === s.id ? 'border-purple-400 bg-purple-400/20 text-purple-400'
                           : 'border-nkt-border text-nkt-muted hover:border-purple-400 hover:text-purple-400 hover:bg-purple-400/10'
