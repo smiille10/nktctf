@@ -410,8 +410,9 @@ router.get('/public', async (req, res) => {
 // GET une école par ID (page portail)
 router.get('/public/:id', async (req, res) => {
   try {
+    await pool.query(`ALTER TABLE schools ADD COLUMN IF NOT EXISTS allowed_domain VARCHAR(100) DEFAULT NULL`).catch(()=>{});
     const result = await pool.query(
-      `SELECT id, name, city, country, plan, allowed_domain, is_active,
+      `SELECT s.id, s.name, s.city, s.country, s.plan, s.allowed_domain, s.is_active,
               COUNT(sm.user_id) FILTER (WHERE sm.role='student')::int as student_count,
               COUNT(sm.user_id) FILTER (WHERE sm.role='teacher')::int as teacher_count
        FROM schools s
