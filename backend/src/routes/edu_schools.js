@@ -37,7 +37,7 @@ router.get('/', authMiddleware, isSuperAdmin, async (req, res) => {
 
 // POST créer une école
 router.post('/', authMiddleware, isSuperAdmin, async (req, res) => {
-  const { name, email, phone, country, city, plan, expires_at } = req.body;
+  const { name, email, phone, country, city, plan, expires_at, allowed_domain } = req.body;
   if (!name || !email) return res.status(400).json({ error: 'Nom et email requis' });
 
   const plans = { starter: 50, school: 200, enterprise: 99999 };
@@ -46,9 +46,9 @@ router.post('/', authMiddleware, isSuperAdmin, async (req, res) => {
 
   try {
     const result = await pool.query(
-      `INSERT INTO schools (name, email, phone, country, city, plan, max_students, access_code, expires_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [name, email, phone, country || 'Mauritanie', city, plan || 'starter', max_students, access_code, expires_at]
+      `INSERT INTO schools (name, email, phone, country, city, plan, max_students, access_code, expires_at, allowed_domain)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      [name, email, phone, country || 'Mauritanie', city, plan || 'starter', max_students, access_code, expires_at, allowed_domain || null]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -59,14 +59,15 @@ router.post('/', authMiddleware, isSuperAdmin, async (req, res) => {
 
 // PUT modifier une école
 router.put('/:id', authMiddleware, isSuperAdmin, async (req, res) => {
-  const { name, email, phone, plan, expires_at, is_active } = req.body;
+  const { name, email, phone, plan, expires_at, is_active, allowed_domain } = req.body;
   const plans = { starter: 50, school: 200, enterprise: 99999 };
   const max_students = plans[plan] || 50;
   try {
     const result = await pool.query(
       `UPDATE schools SET name=$1, email=$2, phone=$3, plan=$4,
-       max_students=$5, expires_at=$6, is_active=$7 WHERE id=$8 RETURNING *`,
-      [name, email, phone, plan, max_students, expires_at, is_active, req.params.id]
+       max_students=$5, expires_at=$6, is_active=$7, allowed_domain=$8
+       WHERE id=$9 RETURNING *`,
+      [name, email, phone, plan, max_students, expires_at, is_active, allowed_domain || null, req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -113,6 +114,19 @@ router.post('/join', authMiddleware, async (req, res) => {
     if (!school.rows[0]) return res.status(404).json({ error: 'Code invalide ou école inactive' });
 
     const s = school.rows[0];
+
+    // ✅ Vérif domaine email
+    if (s.allowed_domain) {
+      const userRow = await pool.query('SELECT email FROM users WHERE id=$1', [req.user.id]);
+      const userEmail = userRow.rows[0]?.email || '';
+      const emailDomain = userEmail.split('@')[1]?.toLowerCase();
+      const allowed = s.allowed_domain.toLowerCase().replace('@', '');
+      if (emailDomain !== allowed) {
+        return res.status(403).json({
+          error: `Email non autorisé. Seuls les emails @${allowed} peuvent rejoindre cette école.`
+        });
+      }
+    }
 
     // Vérif expiration
     if (s.expires_at && new Date(s.expires_at) < new Date()) {
@@ -363,6 +377,162 @@ router.get('/my/certificates', authMiddleware, async (req, res) => {
     `, [sm.rows[0].school_id]);
 
     res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// ─── ROUTES PUBLIQUES (sans auth) ─────────────────────
+
+// GET toutes les écoles actives (page listing)
+router.get('/public', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, name, city, country, plan,
+             allowed_domain, is_active,
+             COUNT(sm.user_id) FILTER (WHERE sm.role='student')::int as student_count,
+             COUNT(sm.user_id) FILTER (WHERE sm.role='teacher')::int as teacher_count
+      FROM schools s
+      LEFT JOIN school_members sm ON sm.school_id = s.id
+      WHERE s.is_active = true
+      GROUP BY s.id
+      ORDER BY s.name ASC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET une école par ID (page portail)
+router.get('/public/:id', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, city, country, plan, allowed_domain, is_active,
+              COUNT(sm.user_id) FILTER (WHERE sm.role='student')::int as student_count,
+              COUNT(sm.user_id) FILTER (WHERE sm.role='teacher')::int as teacher_count
+       FROM schools s
+       LEFT JOIN school_members sm ON sm.school_id = s.id
+       WHERE s.id = $1 AND s.is_active = true
+       GROUP BY s.id`,
+      [req.params.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'École introuvable' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST register depuis portail école
+router.post('/portal/:id/register', async (req, res) => {
+  const { username, email, password, role } = req.body;
+  if (!username || !email || !password || !role)
+    return res.status(400).json({ error: 'Tous les champs sont requis' });
+  if (!['student', 'teacher'].includes(role))
+    return res.status(400).json({ error: 'Rôle invalide' });
+
+  try {
+    const school = await pool.query('SELECT * FROM schools WHERE id=$1 AND is_active=true', [req.params.id]);
+    if (!school.rows[0]) return res.status(404).json({ error: 'École introuvable' });
+    const s = school.rows[0];
+
+    // Vérif domaine
+    if (s.allowed_domain) {
+      const domain = email.split('@')[1]?.toLowerCase();
+      const allowed = s.allowed_domain.toLowerCase().replace('@','');
+      if (domain !== allowed)
+        return res.status(403).json({ error: `Seuls les emails @${allowed} sont autorisés` });
+    }
+
+    // Vérif limite
+    const count = await pool.query("SELECT COUNT(*) FROM school_members WHERE school_id=$1 AND role='student'", [s.id]);
+    if (role === 'student' && parseInt(count.rows[0].count) >= s.max_students)
+      return res.status(403).json({ error: 'Limite d\'étudiants atteinte' });
+
+    // Vérif email/username unique
+    const exists = await pool.query('SELECT id FROM users WHERE email=$1 OR username=$2', [email, username]);
+    if (exists.rows[0]) return res.status(400).json({ error: 'Email ou nom d\'utilisateur déjà pris' });
+
+    const bcrypt = require('bcrypt');
+    const jwt = require('jsonwebtoken');
+    const hash = await bcrypt.hash(password, 10);
+
+    const user = await pool.query(
+      `INSERT INTO users (username, email, password_hash, role, email_verified)
+       VALUES ($1,$2,$3,$4,true) RETURNING *`,
+      [username, email, hash, role === 'teacher' ? 'teacher' : 'user']
+    );
+
+    await pool.query(
+      'INSERT INTO school_members (school_id, user_id, role) VALUES ($1,$2,$3)',
+      [s.id, user.rows[0].id, role]
+    );
+
+    const token = jwt.sign(
+      { id: user.rows[0].id, username, role: user.rows[0].role, school_id: s.id, school_role: role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      token,
+      user: { id: user.rows[0].id, username, email, role: user.rows[0].role, school_id: s.id, school_role: role, score: 0 },
+      school: { id: s.id, name: s.name }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST login depuis portail école
+router.post('/portal/:id/login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'Email et mot de passe requis' });
+
+  try {
+    const school = await pool.query('SELECT * FROM schools WHERE id=$1 AND is_active=true', [req.params.id]);
+    if (!school.rows[0]) return res.status(404).json({ error: 'École introuvable' });
+    const s = school.rows[0];
+
+    // Vérif domaine
+    if (s.allowed_domain) {
+      const domain = email.split('@')[1]?.toLowerCase();
+      const allowed = s.allowed_domain.toLowerCase().replace('@','');
+      if (domain !== allowed)
+        return res.status(403).json({ error: `Seuls les emails @${allowed} sont autorisés` });
+    }
+
+    const userRes = await pool.query('SELECT * FROM users WHERE email=$1', [email]);
+    if (!userRes.rows[0]) return res.status(400).json({ error: 'Email introuvable' });
+    const user = userRes.rows[0];
+
+    const bcrypt = require('bcrypt');
+    const jwt = require('jsonwebtoken');
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return res.status(400).json({ error: 'Mot de passe incorrect' });
+
+    // Vérif membre école
+    const member = await pool.query(
+      'SELECT role FROM school_members WHERE school_id=$1 AND user_id=$2',
+      [s.id, user.id]
+    );
+    if (!member.rows[0]) return res.status(403).json({ error: 'Tu n\'es pas membre de cette école' });
+
+    const school_role = member.rows[0].role;
+
+    const token = jwt.sign(
+      { id: user.id, username: user.username, role: user.role, school_id: s.id, school_role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      token,
+      user: { id: user.id, username: user.username, email: user.email, role: user.role, school_id: s.id, school_role, score: user.score || 0 },
+      school: { id: s.id, name: s.name }
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
