@@ -94,7 +94,7 @@ export default function MySchool() {
     } catch (err) {
       console.error('School error:', err);
       if (err.response?.status === 404 || err.response?.status === 403) {
-        navigate('/join-school');
+        navigate('/school');
       } else {
         setMsg('❌ ' + (err.response?.data?.error || 'Erreur chargement école'));
       }
@@ -214,8 +214,8 @@ export default function MySchool() {
       <div className="text-center">
         <School size={48} className="text-nkt-muted/20 mx-auto mb-4" />
         <p className="font-mono text-sm text-nkt-muted mb-4">Tu n'es dans aucune école</p>
-        <button onClick={() => navigate('/join-school')} className="nkt-btn nkt-btn-solid px-6 py-3 rounded font-mono text-sm">
-          Rejoindre une école
+        <button onClick={() => navigate('/school')} className="nkt-btn nkt-btn-solid px-6 py-3 rounded font-mono text-sm">
+          Voir les écoles
         </button>
       </div>
     </div>

@@ -16,7 +16,6 @@ import Profile from './pages/Profile';
 import Account from './pages/Account';
 import Teams from './pages/Teams';
 import Landing from './pages/Landing';
-import JoinSchool   from './pages/JoinSchool';
 import MySchool          from './pages/MySchool';
 import SchoolList        from './pages/SchoolList';
 import SchoolPortal      from './pages/SchoolPortal';
@@ -74,7 +73,6 @@ function AppRoutes() {
         <Route path="/account"           element={<ProtectedRoute><Account /></ProtectedRoute>} />
 
         {/* ── EDU ── */}
-        <Route path="/join-school"       element={<ProtectedRoute><JoinSchool /></ProtectedRoute>} />
         <Route path="/school"            element={<SchoolList />} />
         <Route path="/school/student"    element={<ProtectedRoute><MySchool /></ProtectedRoute>} />
         <Route path="/school/teacher"    element={<ProtectedRoute><TeacherDashboard /></ProtectedRoute>} />
