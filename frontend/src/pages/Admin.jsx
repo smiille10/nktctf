@@ -68,7 +68,7 @@ const EMPTY_EVENT = {
 };
 
 const EMPTY_SCHOOL = {
-  name: '', email: '', phone: '', country: 'Mauritanie',
+  name: '', email: '', country: 'Mauritanie',
   city: '', plan: 'starter', expires_at: '', allowed_domain: '',
 };
 
@@ -891,11 +891,7 @@ export default function Admin() {
                     <input type="email" className="nkt-input w-full px-4 py-2.5 rounded text-sm" value={schoolForm.email}
                       onChange={e => setSchoolForm({ ...schoolForm, email: e.target.value })} placeholder="contact@ecole.mr" required />
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-mono text-nkt-muted mb-2 tracking-widest">TÉLÉPHONE</label>
-                    <input className="nkt-input w-full px-4 py-2.5 rounded text-sm" value={schoolForm.phone}
-                      onChange={e => setSchoolForm({ ...schoolForm, phone: e.target.value })} placeholder="+222 XX XX XX XX" />
-                  </div>
+
                   <div>
                     <label className="block text-[11px] font-mono text-nkt-muted mb-2 tracking-widest">VILLE</label>
                     <input className="nkt-input w-full px-4 py-2.5 rounded text-sm" value={schoolForm.city}
@@ -925,9 +921,9 @@ export default function Admin() {
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-nkt-muted text-sm">@</span>
                       <input className="nkt-input w-full pl-7 pr-4 py-2.5 rounded text-sm" value={schoolForm.allowed_domain}
                         onChange={e => setSchoolForm({ ...schoolForm, allowed_domain: e.target.value })}
-                        placeholder="groupeisi.com" />
+                        placeholder="ecole.mr" />
                     </div>
-                    <p className="text-[10px] font-mono text-nkt-muted/60 mt-1">Si renseigné, seuls les emails @groupeisi.com pourront rejoindre</p>
+                    <p className="text-[10px] font-mono text-nkt-muted/60 mt-1">Si renseigné, seuls les emails @ecole.mr pourront rejoindre</p>
                   </div>
                   <div className="md:col-span-2 flex gap-3 pt-2">
                     <button type="submit" disabled={loading}
@@ -955,62 +951,54 @@ export default function Admin() {
                 <div key={s.id} className="bg-nkt-card border border-nkt-border rounded-xl overflow-hidden">
 
                   {/* ── Ligne école ── */}
-                  <div className={`px-5 py-4 grid grid-cols-12 gap-2 items-center transition-all ${
+                  <div className={`px-5 py-4 flex items-center gap-4 transition-all ${
                     editingSchool?.id === s.id ? 'border-l-4 bg-purple-500/5' : 'hover:bg-white/[0.02]'
                   }`} style={editingSchool?.id === s.id ? { borderLeftColor: '#a855f7' } : {}}>
-                    <div className="col-span-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0"
-                          style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.3)', color: '#a855f7' }}>
-                          {s.name?.[0]?.toUpperCase() || '?'}
-                        </div>
-                        <div>
-                          <p className="font-mono text-sm text-nkt-text font-semibold">{s.name}</p>
-                          <p className="text-[10px] font-mono text-nkt-muted">{s.city || s.country}</p>
-                        </div>
-                      </div>
+
+                    {/* Avatar */}
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0"
+                      style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.3)', color: '#a855f7' }}>
+                      {s.name?.[0]?.toUpperCase() || '?'}
                     </div>
-                    <div className="col-span-2">
-                      <p className="text-[10px] font-mono text-nkt-muted truncate">{s.email}</p>
+
+                    {/* Nom + ville */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-mono text-sm text-nkt-text font-bold">{s.name}</p>
+                      <p className="text-[10px] font-mono text-nkt-muted">{s.city ? `${s.city}, ` : ''}{s.country}</p>
+                    </div>
+
+                    {/* Email + domaine */}
+                    <div className="hidden md:block min-w-0 w-44">
+                      <p className="text-[11px] font-mono text-nkt-muted truncate">{s.email}</p>
                       {s.allowed_domain
-                        ? <p className="text-[10px] font-mono text-purple-400 mt-0.5">@{s.allowed_domain}</p>
-                        : <p className="text-[10px] font-mono text-nkt-muted/40 mt-0.5">tout domaine</p>
+                        ? <p className="text-[11px] font-mono text-purple-400 font-bold mt-0.5">@{s.allowed_domain}</p>
+                        : <p className="text-[10px] font-mono text-nkt-muted/30 mt-0.5 italic">sans restriction</p>
                       }
                     </div>
-                    <div className="col-span-2">
-                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded border font-bold capitalize ${PLAN_COLORS[s.plan]}`}>
+
+                    {/* Plan */}
+                    <div className="hidden sm:block">
+                      <span className={`text-[10px] font-mono px-2 py-1 rounded border font-bold capitalize ${PLAN_COLORS[s.plan]}`}>
                         {s.plan}
                       </span>
-                      {s.expires_at && (
-                        <p className="text-[9px] font-mono text-nkt-muted mt-1">
-                          exp: {new Date(s.expires_at).toLocaleDateString('fr-FR')}
-                        </p>
-                      )}
                     </div>
-                    <div className="col-span-2 flex items-center gap-1">
-                      <span className="font-mono text-xs text-nkt-cyan tracking-widest font-bold">{s.access_code}</span>
-                      <button onClick={() => copyToClipboard(s.access_code)} className="text-nkt-muted hover:text-nkt-cyan transition-colors p-1">
-                        <Copy size={11} />
-                      </button>
-                      <button onClick={() => handleRegenerateCode(s.id)} className="text-nkt-muted hover:text-yellow-400 transition-colors p-1" title="Régénérer">
-                        <RefreshCw size={11} />
-                      </button>
-                    </div>
-                    <div className="col-span-1">
-                      <button onClick={() => toggleSchoolMembers(s.id)}
-                        className="flex items-center gap-1 text-[11px] font-mono font-bold hover:text-nkt-cyan transition-colors"
-                        style={{ color: expandedSchool === s.id ? '#00d4ff' : '#8899aa' }}>
-                        <Users size={12} />
-                        <span>{s.member_count || 0}</span>
-                        {expandedSchool === s.id ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-                      </button>
-                    </div>
-                    <div className="col-span-1">
-                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
-                        s.is_active ? 'text-nkt-green border-nkt-green/30 bg-nkt-green/10' : 'text-nkt-red border-nkt-red/30 bg-nkt-red/10'
-                      }`}>{s.is_active ? 'ON' : 'OFF'}</span>
-                    </div>
-                    <div className="col-span-1 flex items-center justify-end gap-1">
+
+                    {/* Membres */}
+                    <button onClick={() => toggleSchoolMembers(s.id)}
+                      className="flex items-center gap-1.5 text-[11px] font-mono font-bold hover:text-nkt-cyan transition-colors px-2"
+                      style={{ color: expandedSchool === s.id ? '#00d4ff' : '#8899aa' }}>
+                      <Users size={13} />
+                      <span>{s.member_count || 0}</span>
+                      {expandedSchool === s.id ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                    </button>
+
+                    {/* Statut */}
+                    <span className={`text-[10px] font-mono px-2 py-1 rounded border font-bold ${
+                      s.is_active ? 'text-nkt-green border-nkt-green/30 bg-nkt-green/10' : 'text-nkt-red border-nkt-red/30 bg-nkt-red/10'
+                    }`}>{s.is_active ? 'ACTIF' : 'INACTIF'}</span>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-1">
                       <button onClick={() => window.open(`/school/${s.id}`, '_blank')}
                         className="p-1.5 rounded border border-transparent text-nkt-muted hover:border-purple-400/30 hover:text-purple-400 hover:bg-purple-400/10 transition-all" title="Voir portail">
                         <ExternalLink size={13} />
@@ -1041,7 +1029,7 @@ export default function Admin() {
                       ) : !schoolMembers[s.id] || schoolMembers[s.id].length === 0 ? (
                         <div className="text-center py-8">
                           <p className="font-mono text-xs text-nkt-muted">Aucun membre pour l'instant</p>
-                          <p className="font-mono text-[10px] text-nkt-muted/50 mt-1">Code : <span className="text-nkt-cyan font-bold">{s.access_code}</span></p>
+                          <p className="font-mono text-[10px] text-nkt-muted/50 mt-1">Les membres s'inscrivent via le portail de l'école</p>
                         </div>
                       ) : (
                         <div className="divide-y divide-nkt-border/20">
