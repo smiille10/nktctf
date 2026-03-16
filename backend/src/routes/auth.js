@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const pool = require('../db/pool');
 
 const authMiddleware = require('../middleware/auth');
-const { sendVerificationEmail } = require('../utils/mailer');
+const { sendVerificationEmail, transporter } = require('../utils/mailer');
 
 
 // ───────────────── REGISTER ─────────────────
@@ -281,5 +281,88 @@ router.patch('/update-password', authMiddleware, async (req, res) => {
   }
 });
 
+
+
+// ─── MOT DE PASSE OUBLIÉ ──────────────────────────────
+
+// POST /auth/forgot-password
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email requis' });
+
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    // Toujours répondre OK pour ne pas révéler si l'email existe
+    if (!result.rows[0]) return res.json({ message: 'Si cet email existe, un lien a été envoyé.' });
+
+    const user = result.rows[0];
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1h
+
+    await pool.query(
+      'UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE id = $3',
+      [token, expires, user.id]
+    );
+
+    const url = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+
+    await transporter.sendMail({
+      from: `"NKTCTF" <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: '🔑 NKTCTF — Réinitialisation de mot de passe',
+      html: `
+        <div style="background:#080d14;color:#c9d8e8;font-family:monospace;padding:40px;max-width:500px;margin:0 auto;border:1px solid #1a2a3a;border-radius:8px;">
+          <div style="text-align:center;margin-bottom:30px;">
+            <h1 style="color:#00ff88;font-size:28px;letter-spacing:4px;margin:0;">NKTCTF</h1>
+            <p style="color:#4a6070;font-size:11px;letter-spacing:6px;margin:5px 0;">WHERE HACKERS RISE 🇲🇷</p>
+          </div>
+          <div style="border-top:1px solid #1a2a3a;padding-top:25px;">
+            <p style="color:#c9d8e8;">Salut <strong style="color:#00ff88;">${user.username}</strong>,</p>
+            <p style="color:#4a6070;font-size:13px;">Tu as demandé à réinitialiser ton mot de passe. Clique sur le bouton ci-dessous.</p>
+            <div style="text-align:center;margin:30px 0;">
+              <a href="${url}" style="background:#00ff88;color:#080d14;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:700;font-size:13px;letter-spacing:2px;">
+                [ RÉINITIALISER ]
+              </a>
+            </div>
+            <p style="color:#4a6070;font-size:11px;">Ou copie ce lien :</p>
+            <p style="color:#00d4ff;font-size:11px;word-break:break-all;">${url}</p>
+            <p style="color:#4a6070;font-size:11px;margin-top:20px;">⚠️ Ce lien expire dans 1 heure.</p>
+            <p style="color:#4a6070;font-size:11px;">Si tu n'as pas demandé ça, ignore cet email.</p>
+          </div>
+        </div>
+      `,
+    });
+
+    res.json({ message: 'Si cet email existe, un lien a été envoyé.' });
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// POST /auth/reset-password
+router.post('/reset-password', async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) return res.status(400).json({ error: 'Token et mot de passe requis' });
+  if (password.length < 6) return res.status(400).json({ error: 'Minimum 6 caractères' });
+
+  try {
+    const result = await pool.query(
+      'SELECT * FROM users WHERE reset_token = $1 AND reset_token_expires > NOW()',
+      [token]
+    );
+    if (!result.rows[0]) return res.status(400).json({ error: 'Lien invalide ou expiré' });
+
+    const hash = await bcrypt.hash(password, 12);
+    await pool.query(
+      'UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expires = NULL WHERE id = $2',
+      [hash, result.rows[0].id]
+    );
+
+    res.json({ message: 'Mot de passe mis à jour !' });
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
 
 module.exports = router;

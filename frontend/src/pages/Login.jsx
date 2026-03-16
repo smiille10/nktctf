@@ -96,10 +96,17 @@ export default function Login() {
             </button>
           </form>
 
-          <p className="text-center text-xs font-mono text-nkt-muted mt-6">
-            Pas de compte ?{' '}
-            <Link to="/register" className="text-nkt-green hover:underline">REGISTER</Link>
-          </p>
+          <div className="mt-6 space-y-2 text-center">
+            <p className="text-xs font-mono text-nkt-muted">
+              Pas de compte ?{' '}
+              <Link to="/register" className="text-nkt-green hover:underline">REGISTER</Link>
+            </p>
+            <p className="text-xs font-mono text-nkt-muted">
+              <Link to="/forgot-password" className="text-nkt-muted/60 hover:text-nkt-muted transition-colors">
+                Mot de passe oublié ?
+              </Link>
+            </p>
+          </div>
         </div>
 
         <p className="text-center text-[10px] font-mono text-nkt-muted/40 mt-6">
