@@ -4,14 +4,15 @@ require('dotenv').config();
 console.log('📧 Mailer init:', process.env.GMAIL_USER);
 
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
-  family: 4, // Force IPv4
+  host: '74.125.133.109', // smtp.gmail.com IPv4 direct
+  port: 587,
+  secure: false,
+  requireTLS: true,
   auth: {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_PASS,
   },
+  tls: { rejectUnauthorized: false }
 });
 
 // Test la connexion au démarrage
