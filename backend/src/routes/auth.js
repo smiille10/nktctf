@@ -310,6 +310,10 @@ router.post('/forgot-password', async (req, res) => {
 
     const url = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
 
+    console.log('📤 Sending reset email to:', email, '| URL:', url);
+    console.log('📧 Gmail user:', process.env.GMAIL_USER);
+    console.log('📧 Frontend URL:', process.env.FRONTEND_URL);
+
     transporter.sendMail({
       from: `"NKTCTF" <${process.env.GMAIL_USER}>`,
       to: email,
@@ -334,7 +338,8 @@ router.post('/forgot-password', async (req, res) => {
           </div>
         </div>
       `,
-    }).catch(err => console.error('Email send error:', err));
+    }).then(r => console.log('✅ Reset email sent:', r.messageId))
+      .catch(err => console.error('❌ Reset email FAILED:', err.message, err.code));
 
   } catch (err) {
     console.error('Forgot password error:', err);
