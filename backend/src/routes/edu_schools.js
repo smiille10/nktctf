@@ -3,6 +3,8 @@ const router = express.Router();
 const pool = require('../db/pool');
 const authMiddleware = require('../middleware/auth');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const jwt    = require('jsonwebtoken');
 
 const isSuperAdmin = (req, res, next) => {
   if (req.user.role === 'superadmin') return next();
@@ -458,8 +460,6 @@ router.post('/portal/:id/register', async (req, res) => {
     const exists = await pool.query('SELECT id FROM users WHERE email=$1 OR username=$2', [email, username]);
     if (exists.rows[0]) return res.status(400).json({ error: 'Email ou nom d\'utilisateur déjà pris' });
 
-    const bcrypt = require('bcrypt');
-    const jwt = require('jsonwebtoken');
     const hash = await bcrypt.hash(password, 10);
 
     const user = await pool.query(
@@ -511,8 +511,6 @@ router.post('/portal/:id/login', async (req, res) => {
     if (!userRes.rows[0]) return res.status(400).json({ error: 'Email introuvable' });
     const user = userRes.rows[0];
 
-    const bcrypt = require('bcrypt');
-    const jwt = require('jsonwebtoken');
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(400).json({ error: 'Mot de passe incorrect' });
 
